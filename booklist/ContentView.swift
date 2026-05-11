@@ -1,59 +1,54 @@
-//
-//  ContentView.swift
-//  booklist
-//
-//  Created by Ivan Lepeskevicius on 19/04/2026.
-//
-
 import SwiftUI
-import SwiftData
+
+// MARK: - Navigation selection
+
+/// What is currently selected in the sidebar.
+enum SidebarSelection: Hashable {
+    case inbox
+    case all
+    case folder(UUID)
+}
+
+// MARK: - View mode
+
+/// Layout mode for the content area.
+enum ViewMode: String, CaseIterable {
+    case masonry = "Masonry"
+    case grid    = "Grid"
+    case list    = "List"
+
+    var iconName: String {
+        switch self {
+        case .masonry: "rectangle.3.group"
+        case .grid:    "square.grid.2x2"
+        case .list:    "list.bullet"
+        }
+    }
+}
+
+// MARK: - Sort option
+
+enum SortOption: String, CaseIterable {
+    case recent       = "Recent"
+    case alphabetical = "A–Z"
+    case random       = "Random"
+}
+
+// MARK: - Root view
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var selection: SidebarSelection? = .inbox
 
     var body: some View {
         NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
+            SidebarView(selection: $selection)
         } detail: {
-            Text("Select an item")
+            ContentAreaView(selection: selection ?? .inbox)
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+        .navigationSplitViewStyle(.balanced)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
