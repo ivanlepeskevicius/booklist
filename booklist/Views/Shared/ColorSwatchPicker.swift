@@ -18,12 +18,11 @@ struct ColorSwatchPicker: View {
 
             Divider()
 
-            // Native system ColorPicker for any color not in the palette.
-            // Shows the current color; clicking opens the macOS color panel.
-            HStack {
-                Text("Custom color")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            // Full-width row that opens the macOS color panel for any custom color.
+            HStack(spacing: 8) {
+                Label("Custom color…", systemImage: "eyedropper")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.primary)
                 Spacer()
                 ColorPicker(
                     "",
@@ -36,6 +35,8 @@ struct ColorSwatchPicker: View {
                 .labelsHidden()
                 .frame(width: 28, height: 28)
             }
+            .padding(8)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
         }
     }
 

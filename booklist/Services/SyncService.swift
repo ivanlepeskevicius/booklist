@@ -13,51 +13,11 @@ import AppKit
 /// for persistent access between launches.
 struct SyncService {
 
-    // MARK: - Snapshot types
-
-    struct SyncData: Codable {
-        let version:    Int
-        let exportedAt: Date
-        let folders:    [FolderSnap]
-        let tags:       [TagSnap]
-        let bookmarks:  [BookmarkSnap]
-
-        static let currentVersion = 1
-    }
-
-    struct FolderSnap: Codable {
-        let id: UUID
-        let name: String
-        let icon: String
-        let color: String
-        let sortOrder: Int
-        let parentID: UUID?
-    }
-
-    struct TagSnap: Codable {
-        let id: UUID
-        let name: String
-        let color: String
-    }
-
-    struct BookmarkSnap: Codable {
-        let id: UUID
-        let title: String
-        let url: String
-        let pageDescription: String?
-        let note: String?
-        let faviconURL: String?
-        let imageURLs: [String]
-        let selectedImageURL: String?
-        let itemType: String
-        let price: String?
-        let dateAdded: Date
-        let lastOpenedDate: Date?
-        let isPinned: Bool
-        let isRead: Bool
-        let collectionID: UUID?
-        let tagIDs: [UUID]
-    }
+    // MARK: - Snapshot type aliases (preserve SyncService.XYZ namespace)
+    typealias SyncData = booklist.SyncData
+    typealias FolderSnap = booklist.FolderSnap
+    typealias TagSnap = booklist.TagSnap
+    typealias BookmarkSnap = booklist.BookmarkSnap
 
     // MARK: - Keys
 
@@ -153,7 +113,7 @@ struct SyncService {
 
     // MARK: - Snapshot builder
 
-    private static func buildSnapshot(context: ModelContext) throws -> SyncData {
+    static func buildSnapshot(context: ModelContext) throws -> SyncData {
         let folders   = try context.fetch(FetchDescriptor<Folder>())
         let tags      = try context.fetch(FetchDescriptor<Tag>())
         let bookmarks = try context.fetch(FetchDescriptor<Bookmark>())
@@ -194,7 +154,7 @@ struct SyncService {
 
     // MARK: - Restore
 
-    private static func restore(syncData: SyncData, context: ModelContext) throws {
+    static func restore(syncData: SyncData, context: ModelContext) throws {
         // Delete existing records (bookmarks first to cleanly nullify relationships)
         try context.fetch(FetchDescriptor<Bookmark>()).forEach { context.delete($0) }
         try context.fetch(FetchDescriptor<Tag>()).forEach      { context.delete($0) }

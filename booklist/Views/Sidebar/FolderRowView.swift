@@ -10,7 +10,6 @@ struct FolderRowView: View {
     @Binding var selection: SidebarSelection?
 
     @Environment(\.modelContext) private var modelContext
-    @Query private var allBookmarks: [Bookmark]
     @State private var isDropTargeted = false
 
     private var children: [Folder] {
@@ -24,11 +23,14 @@ struct FolderRowView: View {
             // contentShape ensures the full row width is a drop target, not just the label text.
             .contentShape(Rectangle())
             .dropDestination(for: BookmarkTransfer.self) { items, _ in
-                let ids = items.flatMap { $0.ids }
-                for id in ids {
-                    if let bookmark = allBookmarks.first(where: { $0.id == id }) {
-                        bookmark.collection = folder
-                    }
+                let idSet = Set(items.flatMap { $0.ids })
+                guard !idSet.isEmpty else { return false }
+                // One-shot fetch at drop time — avoids the N live @Query observers that
+                // would otherwise all re-render simultaneously on every bookmark change.
+                if let bookmarks = try? modelContext.fetch(FetchDescriptor<Bookmark>()) {
+                    bookmarks
+                        .filter { idSet.contains($0.id) }
+                        .forEach { $0.collection = folder }
                 }
                 return true
             } isTargeted: { isDropTargeted = $0 }
@@ -39,6 +41,7 @@ struct FolderRowView: View {
                         .allowsHitTesting(false)
                 }
             }
+            .animation(.easeOut(duration: 0.15), value: isDropTargeted)
     }
 
     @ViewBuilder
@@ -62,8 +65,13 @@ struct FolderRowView: View {
         Label {
             Text(folder.name)
         } icon: {
-            Image(systemName: folder.icon)
-                .foregroundStyle(Color(hex: folder.color))
+            if isSFSymbolName(folder.icon) {
+                Image(systemName: folder.icon)
+                    .foregroundStyle(Color(hex: folder.color))
+            } else {
+                Text(folder.icon)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

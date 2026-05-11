@@ -66,6 +66,7 @@ struct TagPickerField: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+            .focusRing(when: isFieldFocused, cornerRadius: 7)
 
             // Inline dropdown
             if showDropdown {
@@ -92,6 +93,7 @@ struct TagPickerField: View {
                 .zIndex(10)
             }
         }
+        .zIndex(showDropdown ? 1 : 0)
         .animation(.easeInOut(duration: 0.12), value: showDropdown)
     }
 
@@ -125,9 +127,14 @@ struct TagPickerField: View {
                 Image(systemName: "plus.circle.fill")
                     .foregroundStyle(Color.accentColor)
                     .font(.system(size: 11))
-                (Text("Create ").foregroundStyle(.secondary)
-                    + Text("#\(trimmed)").fontWeight(.semibold).foregroundStyle(.primary))
-                    .font(.callout)
+                HStack(spacing: 0) {
+                    Text("Create ")
+                        .foregroundStyle(.secondary)
+                    Text("#\(trimmed)")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                }
+                .font(.callout)
                 Spacer()
             }
             .padding(.horizontal, 10)

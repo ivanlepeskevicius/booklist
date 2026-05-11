@@ -7,6 +7,7 @@ struct ImportView: View {
     @Environment(\.dismiss)      private var dismiss
     @Query private var existingBookmarks: [Bookmark]
     @Query(sort: \Folder.sortOrder) private var allFolders: [Folder]
+    @Query(sort: \Tag.name) private var allTags: [Tag]
 
     // MARK: - State enums
 
@@ -298,12 +299,12 @@ struct ImportView: View {
 
     // MARK: - Review (step-through)
 
+    @ViewBuilder
     private var reviewView: some View {
-        guard reviewItems.indices.contains(reviewIndex) else { return AnyView(EmptyView()) }
-        let item = reviewItems[reviewIndex]
-        let isLast = reviewIndex + 1 >= reviewItems.count
+        if reviewItems.indices.contains(reviewIndex) {
+            let item = reviewItems[reviewIndex]
+            let isLast = reviewIndex + 1 >= reviewItems.count
 
-        return AnyView(
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -452,7 +453,7 @@ struct ImportView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
             }
-        )
+        }
     }
 
     private var reviewWishlistSection: some View {
@@ -577,7 +578,12 @@ struct ImportView: View {
     private func parseHTML(_ html: String) {
         state = .loading("Parsing bookmarks…")
         Task.detached(priority: .userInitiated) {
-            let parsed = ImportService.parseNetscapeHTML(html)
+            // Check for booklist export first — lossless round-trip with notes, prices, tags, etc.
+            if let parsed = await ImportService.parseBooklistHTML(html) {
+                await MainActor.run { state = .preview(parsed) }
+                return
+            }
+            let parsed = await ImportService.parseNetscapeHTML(html)
             await MainActor.run {
                 if parsed.isEmpty {
                     state = .failed("No bookmarks found in that file. Make sure you exported in HTML format.")
@@ -621,15 +627,15 @@ struct ImportView: View {
         guard reviewItems.indices.contains(index) else { return }
         let item = reviewItems[index]
 
-        // Reset all per-item state
+        // Reset all per-item state, pre-filling any rich data from a booklist export
         reviewTitle         = item.title
-        reviewNote          = ""
-        reviewTags          = []
-        reviewIsWishlist    = false
-        reviewPrice         = ""
+        reviewNote          = item.note ?? ""
+        reviewTags          = item.tags.compactMap { name in allTags.first { $0.name == name } }
+        reviewIsWishlist    = item.isWishlistItem
+        reviewPrice         = item.price ?? ""
         reviewFolderID      = nil
-        reviewImages        = []
-        reviewSelectedImage = nil
+        reviewImages        = item.imageURL.map { [$0] } ?? []
+        reviewSelectedImage = item.imageURL
         reviewFaviconURL    = nil
         reviewDescription   = nil
         reviewIsFetching    = true
@@ -642,12 +648,16 @@ struct ImportView: View {
                 guard !Task.isCancelled,
                       reviewItems.indices.contains(reviewIndex),
                       reviewItems[reviewIndex].url == item.url else { return }
-                if !meta.title.isEmpty { reviewTitle = meta.title }
-                reviewDescription   = meta.description
-                reviewFaviconURL    = meta.faviconURL
-                reviewImages        = meta.imageURLs
-                reviewSelectedImage = meta.imageURLs.first
-                if let price = meta.price, !price.isEmpty {
+                // Only override title if it's still just the raw URL (no real title found yet)
+                if !meta.title.isEmpty, reviewTitle == item.url { reviewTitle = meta.title }
+                reviewDescription = meta.description
+                if reviewFaviconURL == nil { reviewFaviconURL = meta.faviconURL }
+                // Merge fetched images without duplicating pre-filled ones
+                let newImages = meta.imageURLs.filter { !reviewImages.contains($0) }
+                reviewImages += newImages
+                if reviewSelectedImage == nil { reviewSelectedImage = meta.imageURLs.first }
+                // Only auto-set price from metadata if not already known from export
+                if item.price == nil, let price = meta.price, !price.isEmpty {
                     reviewIsWishlist = true
                     reviewPrice      = price
                 }

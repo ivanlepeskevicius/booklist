@@ -47,7 +47,7 @@ struct ImageUploadZone: View {
                 .overlay {
                     Label("Drop an image here", systemImage: "photo.badge.arrow.down")
                         .font(.callout)
-                        .foregroundStyle(isTargeted ? Color.accentColor : .tertiary)
+                        .foregroundStyle(isTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
                 }
                 .onDrop(of: [UTType.image, UTType.fileURL], isTargeted: $isTargeted) { providers in
                     handleDrop(providers)

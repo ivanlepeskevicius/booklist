@@ -2,11 +2,15 @@ import SwiftUI
 import SwiftData
 
 struct CaptureView: View {
+    /// Pre-filled when the view is opened via a deep link or Share Extension.
+    var initialURL:   String = ""
+    var initialTitle: String = ""
+
     @Environment(\.dismiss)      private var dismiss
     @Environment(\.modelContext) private var modelContext
 
+    @Query private var allBookmarks: [Bookmark]
     @Query(sort: \Folder.sortOrder) private var allFolders: [Folder]
-    @Query(sort: \Tag.name)         private var allTags:    [Tag]
 
     // ── Form state ───────────────────────────────────────────────
     @State private var urlString       = ""
@@ -24,13 +28,68 @@ struct CaptureView: View {
 
     // ── Selection state ──────────────────────────────────────────
     @State private var selectedFolderID: UUID?
-    @State private var selectedTagIDs = Set<UUID>()
+    @State private var selectedTags: [Tag] = []
+    @State private var isWishlistItem  = false
+    @State private var price           = ""
+    @State private var managingDuplicate: Bookmark? = nil
+    @State private var showingNewFolder  = false
+
+    @AppStorage("preferredCurrency") private var preferredCurrency = Locale.current.currency?.identifier ?? "USD"
+
+    // ── Focus ────────────────────────────────────────────────────
+    private enum Field { case url, title, note, price }
+    @FocusState private var focused: Field?
 
     // ── Debounce ─────────────────────────────────────────────────
     @State private var fetchTask: Task<Void, Never>?
 
     // ── Computed ─────────────────────────────────────────────────
-    private var canSave: Bool { !urlString.isEmpty && !title.isEmpty }
+
+    /// The URL as it will actually be stored/fetched — adds https:// when the user omits the scheme.
+    private var effectiveURL: String {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        return (trimmed.hasPrefix("https://") || trimmed.hasPrefix("http://"))
+            ? trimmed
+            : "https://" + trimmed
+    }
+
+    private var canSave: Bool { !effectiveURL.isEmpty && !title.isEmpty }
+
+    private var currencySymbol: String {
+        let symbols: [String: String] = [
+            "AUD": "A$", "BRL": "R$", "CAD": "CA$", "CHF": "Fr",
+            "CNY": "¥",  "DKK": "kr", "EUR": "€",   "GBP": "£",
+            "INR": "₹",  "JPY": "¥",  "KRW": "₩",   "MXN": "MX$",
+            "NOK": "kr", "PLN": "zł", "SEK": "kr",   "USD": "$",
+        ]
+        return symbols[preferredCurrency] ?? preferredCurrency
+    }
+
+    /// Ensures the saved price has a currency prefix. If the user typed a bare
+    /// number (e.g. "29.99"), the selected currency symbol is prepended.
+    private func formattedPrice(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let first = trimmed.first else { return trimmed }
+        return first.isNumber ? currencySymbol + trimmed : trimmed
+    }
+
+    /// Strips scheme, trailing slash, and lowercases so "https://Example.com/" == "http://example.com".
+    private func normalisedURL(_ url: String) -> String {
+        var s = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for prefix in ["https://", "http://"] {
+            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)); break }
+        }
+        if s.hasSuffix("/") { s = String(s.dropLast()) }
+        return s
+    }
+
+    /// Non-nil when the current URL already exists in the library.
+    private var duplicateBookmark: Bookmark? {
+        guard !effectiveURL.isEmpty else { return nil }
+        let target = normalisedURL(effectiveURL)
+        return allBookmarks.first { normalisedURL($0.url) == target }
+    }
 
     private var selectedFolder: Folder? {
         allFolders.first { $0.id == selectedFolderID }
@@ -57,17 +116,24 @@ struct CaptureView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     urlField
-                    if let error = fetchError {
-                        errorBanner(error)
-                    }
-                    if hasFetched {
-                        titleField
-                        noteField
-                        if !candidateImages.isEmpty {
-                            thumbnailSection
+                    if let dup = duplicateBookmark {
+                        duplicateBanner(dup)
+                    } else {
+                        if let error = fetchError {
+                            errorBanner(error)
                         }
-                        Divider()
-                        organizationSection
+                        if hasFetched {
+                            titleField
+                            if let desc = pageDescription, !desc.isEmpty {
+                                pageDescriptionView(desc)
+                            }
+                            wishlistSection
+                            noteField
+                            tagsSection
+                            thumbnailSection
+                            Divider()
+                            organizationSection
+                        }
                     }
                 }
                 .padding(20)
@@ -77,6 +143,23 @@ struct CaptureView: View {
         }
         .frame(width: 480)
         .frame(minHeight: 300, maxHeight: 700)
+        .sheet(item: $managingDuplicate) { bookmark in
+            ManagePanelView(bookmark: bookmark)
+        }
+        .sheet(isPresented: $showingNewFolder) {
+            FolderFormView(mode: .add(parentID: nil)) { newFolder in
+                selectedFolderID = newFolder.id
+            }
+        }
+        // When opened via deep link / Share Extension, pre-fill and fetch immediately.
+        .task {
+            guard !initialURL.isEmpty else { return }
+            urlString = initialURL
+            if !initialTitle.isEmpty { title = initialTitle }
+            // Yield one cycle so the URL field renders before the spinner appears.
+            try? await Task.sleep(for: .milliseconds(50))
+            await fetchMetadata(for: effectiveURL)
+        }
     }
 
     // MARK: - Subviews
@@ -85,7 +168,7 @@ struct CaptureView: View {
         HStack {
             Image(systemName: "link.badge.plus")
                 .font(.title3)
-                .foregroundStyle(.accent)
+                .foregroundColor(.accentColor)
             Text("New Capture")
                 .font(.headline)
             Spacer()
@@ -108,11 +191,14 @@ struct CaptureView: View {
             HStack(spacing: 8) {
                 TextField("Paste a link…", text: $urlString)
                     .textFieldStyle(.plain)
+                    .focused($focused, equals: .url)
                     .textContentType(.URL)
-                    .onSubmit { triggerFetch(for: urlString) }
-                    .onChange(of: urlString) { _, newValue in
-                        guard newValue.starts(with: "http") else { return }
-                        scheduleFetch(for: newValue)
+                    .onSubmit { triggerFetch(for: effectiveURL) }
+                    .onChange(of: urlString) { _, _ in
+                        // Require at least a partial domain (contains a dot) before fetching
+                        let url = effectiveURL
+                        guard url.contains("."), urlString.count >= 4 else { return }
+                        scheduleFetch(for: url)
                     }
 
                 if isFetching {
@@ -121,6 +207,7 @@ struct CaptureView: View {
             }
             .padding(10)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .focusRing(when: focused == .url)
         }
     }
 
@@ -133,6 +220,40 @@ struct CaptureView: View {
             .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }
 
+    private func duplicateBanner(_ existing: Bookmark) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.on.doc.fill")
+                .foregroundStyle(Color.accentColor)
+                .font(.title3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Already in your library")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Text(existing.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button("View Item") {
+                managingDuplicate = existing
+            }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
+        }
+    }
+
     private var titleField: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("Title", systemImage: "textformat")
@@ -141,9 +262,21 @@ struct CaptureView: View {
 
             TextField("Page title", text: $title)
                 .textFieldStyle(.plain)
+                .focused($focused, equals: .title)
                 .padding(10)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                .focusRing(when: focused == .title)
         }
+    }
+
+    private func pageDescriptionView(_ desc: String) -> some View {
+        Text(desc)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .lineLimit(3)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var noteField: some View {
@@ -154,96 +287,127 @@ struct CaptureView: View {
 
             TextField("Why are you saving this? (optional)", text: $note, axis: .vertical)
                 .textFieldStyle(.plain)
+                .focused($focused, equals: .note)
                 .lineLimit(3...5)
                 .padding(10)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                .focusRing(when: focused == .note)
         }
     }
 
     private var thumbnailSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Thumbnail — tap to choose", systemImage: "photo.on.rectangle")
+            Label("Thumbnail", systemImage: "photo.on.rectangle")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            ImagePickerGrid(imageURLs: candidateImages, selectedURL: $selectedImageURL)
+            if !candidateImages.isEmpty {
+                ImagePickerGrid(imageURLs: candidateImages, selectedURL: $selectedImageURL)
+            }
+
+            ImageUploadZone { savedURL in
+                if !candidateImages.contains(savedURL) {
+                    candidateImages.append(savedURL)
+                }
+                selectedImageURL = savedURL
+            }
+        }
+    }
+
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Tags", systemImage: "tag")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            TagPickerField(selectedTags: $selectedTags)
         }
     }
 
     private var organizationSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Collection picker
-            VStack(alignment: .leading, spacing: 6) {
-                Label("Add to", systemImage: "folder")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Add to", systemImage: "folder")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-                Menu {
-                    Button {
-                        selectedFolderID = nil
-                    } label: {
-                        Label("Inbox (no folder)", systemImage: "tray")
-                    }
-                    Divider()
-                    ForEach(folderOptions, id: \.id) { option in
-                        Button {
-                            selectedFolderID = option.id
-                        } label: {
-                            Label(option.label, systemImage: option.icon)
-                        }
-                    }
+            Menu {
+                Button {
+                    selectedFolderID = nil
                 } label: {
-                    HStack {
-                        Label(
-                            selectedFolder?.name ?? "Inbox",
-                            systemImage: selectedFolder?.icon ?? "tray"
-                        )
-                        Spacer()
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(10)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                    Label("Inbox (no folder)", systemImage: "tray")
                 }
-                .menuStyle(.borderlessButton)
+                Divider()
+                ForEach(folderOptions, id: \.id) { option in
+                    Button {
+                        selectedFolderID = option.id
+                    } label: {
+                        Label(option.label, systemImage: option.icon)
+                    }
+                }
+                if !folderOptions.isEmpty { Divider() }
+                Button {
+                    showingNewFolder = true
+                } label: {
+                    Label("New Folder…", systemImage: "folder.badge.plus")
+                }
+            } label: {
+                HStack {
+                    Label(
+                        selectedFolder?.name ?? "Inbox",
+                        systemImage: selectedFolder?.icon ?? "tray"
+                    )
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .menuStyle(.borderlessButton)
+        }
+    }
+
+    private var wishlistSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $isWishlistItem) {
+                Label("Save as wishlist item", systemImage: "cart")
+                    .font(.subheadline)
+            }
+            .toggleStyle(.switch)
+
+            // When a price was auto-detected but the toggle is off, show a hint
+            // so the user knows the value is waiting for them.
+            if !isWishlistItem && !price.isEmpty {
+                Label("Price found: \(price) — turn on to save it", systemImage: "tag")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
             }
 
-            // Tag picker
-            if !allTags.isEmpty {
+            // Full price field when wishlist is enabled
+            if isWishlistItem {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("Tags", systemImage: "tag")
+                    Label("Price", systemImage: "tag")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(allTags) { tag in
-                                let isSelected = selectedTagIDs.contains(tag.id)
-                                Button {
-                                    if isSelected { selectedTagIDs.remove(tag.id) }
-                                    else          { selectedTagIDs.insert(tag.id) }
-                                } label: {
-                                    Text("#\(tag.name)")
-                                        .font(.caption)
-                                        .fontWeight(isSelected ? .semibold : .regular)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 4)
-                                        .background(
-                                            isSelected
-                                                ? Color(hex: tag.color)
-                                                : Color(hex: tag.color).opacity(0.15),
-                                            in: Capsule()
-                                        )
-                                        .foregroundStyle(isSelected ? .white : Color(hex: tag.color))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                    HStack(spacing: 4) {
+                        Text(currencySymbol)
+                            .foregroundStyle(.secondary)
+                        TextField("", text: $price)
+                            .textFieldStyle(.plain)
+                            .focused($focused, equals: .price)
                     }
+                    .padding(10)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                    .focusRing(when: focused == .price)
                 }
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.15), value: isWishlistItem)
+        .animation(.easeInOut(duration: 0.15), value: price.isEmpty)
     }
 
     private var footer: some View {
@@ -256,10 +420,10 @@ struct CaptureView: View {
             Spacer()
             Button("Cancel") { dismiss() }
                 .keyboardShortcut(.escape)
-            Button("Save Bookmark") { save() }
+            Button(isWishlistItem ? "Save to Wishlist" : "Save Bookmark") { save() }
                 .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
-                .disabled(!canSave)
+                .disabled(!canSave || duplicateBookmark != nil)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -275,13 +439,13 @@ struct CaptureView: View {
             // Debounce — wait for the user to stop typing
             try? await Task.sleep(for: .milliseconds(600))
             guard !Task.isCancelled else { return }
-            await triggerFetch(for: url)
+            triggerFetch(for: url)
         }
     }
 
     @MainActor
     private func triggerFetch(for urlString: String) {
-        guard !urlString.isEmpty, urlString.starts(with: "http") else { return }
+        guard !urlString.isEmpty, urlString.contains(".") else { return }
         fetchTask?.cancel()
         fetchTask = Task { await fetchMetadata(for: urlString) }
     }
@@ -298,6 +462,19 @@ struct CaptureView: View {
             faviconURL       = meta.faviconURL
             candidateImages  = meta.imageURLs
             selectedImageURL = meta.imageURLs.first
+            // Pre-fill price if the page has structured pricing data
+            if let extractedPrice = meta.price, !extractedPrice.isEmpty {
+                price = extractedPrice
+            }
+            // Synthesize a post card image for Reddit (text posts have no remote thumbnail)
+            if let subreddit = meta.redditSubreddit {
+                await generateRedditCard(
+                    title: meta.title,
+                    body: meta.description,
+                    subreddit: subreddit,
+                    author: meta.redditAuthor ?? ""
+                )
+            }
             hasFetched       = true
         } catch {
             fetchError = error.localizedDescription
@@ -308,24 +485,95 @@ struct CaptureView: View {
         isFetching = false
     }
 
+    // MARK: - Reddit card
+
+    @MainActor
+    private func generateRedditCard(title: String, body: String?, subreddit: String, author: String) async {
+        let card = RedditPostCard(title: title, postBody: body, subreddit: subreddit, author: author)
+            .environment(\.colorScheme, .light)
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = 2.0
+        guard let image = renderer.nsImage,
+              let savedURL = try? ImageStore.save(image) else { return }
+        candidateImages.insert(savedURL, at: 0)
+        selectedImageURL = savedURL
+    }
+
     // MARK: - Save
 
     private func save() {
-        let tags   = allTags.filter { selectedTagIDs.contains($0.id) }
+        let tags   = selectedTags
         let folder = selectedFolder
 
         let bookmark = Bookmark(
-            title: title.isEmpty ? urlString : title,
-            url: urlString,
+            title: title.isEmpty ? effectiveURL : title,
+            url: effectiveURL,
             pageDescription: pageDescription,
             note: note.isEmpty ? nil : note,
             faviconURL: faviconURL,
             imageURLs: candidateImages,
             selectedImageURL: selectedImageURL,
+            itemType: isWishlistItem ? .wishlistItem : .bookmark,
+            price: isWishlistItem && !price.isEmpty ? formattedPrice(price) : nil,
             collection: folder,
             tags: tags
         )
         modelContext.insert(bookmark)
         dismiss()
+    }
+}
+
+// MARK: - Reddit post card (used by ImageRenderer to generate a thumbnail)
+
+private struct RedditPostCard: View {
+    let title: String
+    let postBody: String?
+    let subreddit: String
+    let author: String
+
+    private let redditOrange = Color(red: 1.0, green: 0.27, blue: 0.0)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header bar
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundStyle(redditOrange)
+                    .font(.system(size: 12))
+                Text("r/\(subreddit)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(redditOrange)
+                Spacer()
+                if !author.isEmpty {
+                    Text("u/\(author)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(white: 0.45))
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(Color(white: 0.96))
+
+            // Content
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color(white: 0.10))
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let postBody, !postBody.isEmpty {
+                    Text(postBody)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(white: 0.35))
+                        .lineLimit(7)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white)
+        }
+        .frame(width: 560)
     }
 }

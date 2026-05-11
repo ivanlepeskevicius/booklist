@@ -27,7 +27,9 @@ struct SyncData: Codable {
         try c.encode(tags,       forKey: .tags)
         try c.encode(bookmarks,  forKey: .bookmarks)
     }
+}
 
+extension SyncData {
     nonisolated init(from decoder: any Decoder) throws {
         let c    = try decoder.container(keyedBy: CodingKeys.self)
         version    = try c.decode(Int.self,            forKey: .version)
@@ -59,7 +61,9 @@ struct FolderSnap: Codable {
         try c.encode(sortOrder, forKey: .sortOrder)
         try c.encodeIfPresent(parentID, forKey: .parentID)
     }
+}
 
+extension FolderSnap {
     nonisolated init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id        = try c.decode(UUID.self,   forKey: .id)
@@ -86,7 +90,9 @@ struct TagSnap: Codable {
         try c.encode(name,  forKey: .name)
         try c.encode(color, forKey: .color)
     }
+}
 
+extension TagSnap {
     nonisolated init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id    = try c.decode(UUID.self,   forKey: .id)
@@ -139,7 +145,9 @@ struct BookmarkSnap: Codable {
         try c.encodeIfPresent(collectionID,     forKey: .collectionID)
         try c.encode(tagIDs,          forKey: .tagIDs)
     }
+}
 
+extension BookmarkSnap {
     nonisolated init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id              = try c.decode(UUID.self,     forKey: .id)

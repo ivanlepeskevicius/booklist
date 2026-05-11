@@ -31,6 +31,15 @@ final class Bookmark {
     var price: String?      // only used for .wishlistItem
 
     var dateAdded: Date
+    /// Set to the current date each time the user opens this link in a browser.
+    /// nil means the link has never been opened after saving.
+    var lastOpenedDate: Date?
+
+    /// Sort proxy — returns lastOpenedDate or .distantPast so TableColumn can use a key path comparator.
+    var lastOpenedDateForSorting: Date { lastOpenedDate ?? .distantPast }
+
+    /// Sort proxy for the Tags column — first tag name alphabetically, empty string for untagged items.
+    var tagSortKey: String { tags.min { $0.name < $1.name }?.name ?? "" }
     var isPinned: Bool
     var isRead: Bool
 

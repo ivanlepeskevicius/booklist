@@ -1,6 +1,6 @@
 # Product Requirements — booklist
 
-_Last updated: 2026-04-19_
+_Last updated: 2026-04-28_
 
 ---
 
@@ -46,11 +46,11 @@ The target user has ADHD and gets overwhelmed by disorganized digital informatio
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| O1 | Collections (like folders) that can be nested up to 2–3 levels deep | Must |
+| O1 | Collections (like folders) that can be nested up to 2–4 levels deep | Must |
 | O2 | Tags: flat, fast-to-assign, multiple per item | Must |
 | O3 | Each collection gets a custom color and icon (emoji or SF Symbol) | Must |
 | O4 | Each tag gets a custom color | Should |
-| O5 | Inbox: all new saves land here until manually organized | Must |
+| O5 | Inbox: all new saves land here until manually organized unless they were organized upon creation | Must |
 | O6 | Smart Collections: auto-populate based on rules (e.g., "tagged #design", "saved this week") | Could |
 | O7 | Move items between collections via drag & drop | Must |
 
@@ -149,12 +149,29 @@ These are not features — they are constraints that apply to every decision:
 
 ---
 
-## Milestones (Rough)
+## Milestones
 
-| Phase | Focus |
-|---|---|
-| **Phase 1 — Core** | Data model, collections, tags, item cards with notes, list+grid views, search |
-| **Phase 2 — Capture** | Quick-capture shortcut, Share Sheet, metadata auto-fetch |
-| **Phase 3 — Polish** | Masonry view, custom colors/icons, reader mode, launch at login |
-| **Phase 4 — Wishlist** | Wishlist collection type, product card layout, price field |
-| **Phase 5 — Sync & Mobile** | iCloud sync, iOS app |
+| Phase | Focus | Status |
+|---|---|---|
+| **Phase 1 — Core** | Data model, collections, tags, item cards with notes, list+grid views, search | ✅ Done |
+| **Phase 2 — Capture** | Quick-capture overlay, Share Sheet extension, metadata auto-fetch | ✅ Done |
+| **Phase 3 — Polish** | Masonry view, custom folder colors/icons, reader mode, launch at login, menu bar icon | ✅ Done |
+| **Phase 4 — Import/Export/Sync** | Import from browser HTML, export to HTML, share integration, folder-based JSON sync | ✅ Done |
+| **Phase 5 — Wishlist** | Wishlist item type, price field, wishlist card layout | ✅ Done (basic: isWishlistItem flag + price field; dedicated card layout pending) |
+| **Phase 6 — Quality** | Unit tests, UI tests, edge case hardening | 🔄 In progress |
+| **Phase 7 — Advanced** | Smart collections, price tracking, Spotlight integration, browser extension | ⬜ Future |
+| **Phase 8 — Mobile** | iOS companion app | ⬜ Future |
+
+### Implementation Notes
+
+| ID | Status | Notes |
+|----|--------|-------|
+| C2 | ✅ | macOS Share Extension (`booklist share.appex`) implemented |
+| C3 | ✅ | `MetadataFetcher` auto-fetches OG tags + favicon with Safari UA |
+| I6 | ✅ | `ReaderView` via `WKWebView` + `ReaderService` |
+| O3 | ✅ | `IconPickerView`: SF Symbol picker + color picker per folder |
+| P2 | ⚠️ | Implemented as folder-based JSON sync (free); true iCloud/CloudKit requires paid developer account |
+| P3 | ✅ | Launch at login toggle in Settings → General |
+| P4 | ✅ | `NSStatusItem` menu bar icon with Open/Settings/Quit menu |
+| P6 | ✅ | Export to rich HTML with embedded JSON (`__BOOKLIST_DATA__`) for lossless re-import |
+| P7 | ✅ | Import from Netscape HTML (browser bookmarks) + booklist HTML round-trip |

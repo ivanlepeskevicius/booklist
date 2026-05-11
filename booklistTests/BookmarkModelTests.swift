@@ -3,6 +3,9 @@ import SwiftData
 import Foundation
 @testable import booklist
 
+// Shadow Testing.Tag so our SwiftData Tag model is unambiguous throughout this file.
+private typealias Tag = booklist.Tag
+
 @Suite("Bookmark + Folder model computed properties")
 struct BookmarkModelTests {
 

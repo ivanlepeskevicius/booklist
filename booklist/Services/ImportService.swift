@@ -7,6 +7,12 @@ struct ImportService {
         let title: String
         let url: String
         var folderPath: String?
+        // Extended fields — populated when imported from a booklist HTML export
+        var note: String?
+        var price: String?
+        var isWishlistItem: Bool = false
+        var imageURL: String?
+        var tags: [String] = []
     }
 
     // MARK: - Netscape HTML (Chrome, Safari, Firefox, Edge)
@@ -46,6 +52,33 @@ struct ImportService {
         return results
     }
 
+    // MARK: - booklist HTML export (round-trip)
+
+    /// Detects the embedded `__BOOKLIST_DATA__` JSON in a booklist HTML export and returns
+    /// losslessly parsed bookmarks. Returns `nil` if the file is not a booklist export.
+    static func parseBooklistHTML(_ html: String) -> [ParsedBookmark]? {
+        let pattern = #"<script id="__BOOKLIST_DATA__" type="application/json">(.+?)</script>"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .dotMatchesLineSeparators),
+              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+              let range = Range(match.range(at: 1), in: html) else { return nil }
+        let jsonString = String(html[range]).trimmingCharacters(in: .whitespaces)
+        guard let data  = jsonString.data(using: .utf8),
+              let items = try? JSONDecoder().decode([ExportService.ExportItem].self, from: data),
+              !items.isEmpty else { return nil }
+        return items.map { item in
+            ParsedBookmark(
+                title:         item.title,
+                url:           item.url,
+                folderPath:    item.folderPath,
+                note:          item.note,
+                price:         item.price,
+                isWishlistItem: item.isWishlistItem,
+                imageURL:      item.imageURL,
+                tags:          item.tags
+            )
+        }
+    }
+
     // MARK: - Arc shared folder
 
     /// Fetches an Arc shared folder URL and returns its bookmarks.
@@ -65,8 +98,12 @@ struct ImportService {
             throw ImportError.noContent
         }
 
-        // --- Try __NEXT_DATA__ JSON first ---
+        // --- Try Arc-specific __NEXT_DATA__ structure first ---
         if let json = extractNextData(from: html) {
+            let arcItems = extractArcItems(from: json)
+            if !arcItems.isEmpty { return arcItems }
+
+            // Fallback: generic recursive key search
             var results: [ParsedBookmark] = []
             extractBookmarks(from: json, into: &results)
             if !results.isEmpty { return results }
@@ -89,6 +126,29 @@ struct ImportService {
               let range = Range(match.range(at: 1), in: html) else { return nil }
         let jsonString = String(html[range])
         return try? JSONSerialization.jsonObject(with: Data(jsonString.utf8))
+    }
+
+    /// Parses the Arc shared-folder __NEXT_DATA__ structure:
+    /// props.pageProps.data.items[].data.tab.{savedURL, savedTitle}
+    private static func extractArcItems(from json: Any) -> [ParsedBookmark] {
+        guard let root       = json as? [String: Any],
+              let props      = root["props"]      as? [String: Any],
+              let pageProps  = props["pageProps"] as? [String: Any],
+              let data       = pageProps["data"]  as? [String: Any],
+              let items      = data["items"]      as? [[String: Any]] else { return [] }
+
+        var results: [ParsedBookmark] = []
+        for item in items {
+            guard let itemData = item["data"] as? [String: Any],
+                  let tab      = itemData["tab"] as? [String: Any],
+                  let savedURL = tab["savedURL"] as? String,
+                  savedURL.hasPrefix("http://") || savedURL.hasPrefix("https://") else { continue }
+            let title = (tab["savedTitle"] as? String)
+                        ?? (item["title"] as? String)
+                        ?? savedURL
+            results.append(ParsedBookmark(title: title, url: savedURL))
+        }
+        return results
     }
 
     /// Recursively walks an Any (JSON) tree and collects objects that look like bookmarks

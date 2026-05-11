@@ -1,6 +1,6 @@
 # Product Requirements — booklist
 
-_Last updated: 2026-04-19_
+_Last updated: 2026-04-19 — capture flow clarified; nesting corrected; milestones updated_
 
 ---
 
@@ -34,11 +34,12 @@ The target user has ADHD and gets overwhelmed by disorganized digital informatio
 |----|-------------|----------|
 | C1 | Global keyboard shortcut to open a quick-capture overlay from anywhere (active app, browser, anywhere on macOS) | Must |
 | C2 | macOS Share Sheet integration so any app can send links/images directly to booklist | Must |
-| C3 | Paste a URL and auto-fetch metadata: title, description, thumbnail image, favicon | Must |
+| C3 | Paste a URL → immediately auto-fetch metadata (title, description, candidate images, favicon) → show a review modal so the user can edit before saving | Must |
 | C4 | Drag & drop a URL, image, or file from any app into booklist | Should |
-| C5 | Browser extension (Safari first, Arc/Chrome later) to save current tab with one click | Should |
+| C5 | Browser extension (Arc/Chrome later) to save current tab with one click | Should |
 | C6 | Capture note/text alongside URL at save time — without opening a new screen | Must |
 | C7 | Assign tags and collection during capture — without leaving the capture widget | Should |
+| C8 | During capture, show all images found on the page and let the user pick which one to use as the card thumbnail | Must |
 
 ---
 
@@ -46,7 +47,7 @@ The target user has ADHD and gets overwhelmed by disorganized digital informatio
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| O1 | Collections (like folders) that can be nested up to 2–3 levels deep | Must |
+| O1 | Collections (folders) can be nested to unlimited depth — user decides their own hierarchy | Must |
 | O2 | Tags: flat, fast-to-assign, multiple per item | Must |
 | O3 | Each collection gets a custom color and icon (emoji or SF Symbol) | Must |
 | O4 | Each tag gets a custom color | Should |
@@ -151,10 +152,11 @@ These are not features — they are constraints that apply to every decision:
 
 ## Milestones (Rough)
 
-| Phase | Focus |
-|---|---|
-| **Phase 1 — Core** | Data model, collections, tags, item cards with notes, list+grid views, search |
-| **Phase 2 — Capture** | Quick-capture shortcut, Share Sheet, metadata auto-fetch |
-| **Phase 3 — Polish** | Masonry view, custom colors/icons, reader mode, launch at login |
-| **Phase 4 — Wishlist** | Wishlist collection type, product card layout, price field |
-| **Phase 5 — Sync & Mobile** | iCloud sync, iOS app |
+| Phase | Status | Focus |
+|---|---|---|
+| **Phase 1 — Foundation** | ✅ Done | Data models (Bookmark, Folder, Tag), full UI skeleton (sidebar, masonry/grid/list, manage panel) |
+| **Phase 2 — Capture** | 🔄 In progress | URL paste → metadata fetch → review modal with image picker; sample data |
+| **Phase 3 — Folders & Tags** | Pending | Add/edit/delete folders and tags from the UI; drag & drop to move items |
+| **Phase 4 — Polish** | Pending | Custom folder colors/icons, reader mode, launch at login, menu bar icon |
+| **Phase 5 — Wishlist** | Pending | Wishlist card layout, price field, price tracking |
+| **Phase 6 — Sync & Mobile** | Pending | iCloud sync, iOS companion app |

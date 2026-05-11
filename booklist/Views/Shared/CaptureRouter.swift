@@ -14,4 +14,22 @@ final class CaptureRouter {
 
     static let shared = CaptureRouter()
     private init() {}
+
+    private static let appGroupID = "group.lepi.booklist"
+
+    /// Reads a URL left by the Share Extension in the shared App Group UserDefaults
+    /// and routes it into the capture sheet. Safe to call from anywhere.
+    func checkPendingCapture() {
+        let defaults = UserDefaults(suiteName: Self.appGroupID)
+        guard
+            let urlString = defaults?.string(forKey: "pendingCaptureURL"),
+            !urlString.isEmpty
+        else { return }
+
+        pendingURL   = urlString
+        pendingTitle = defaults?.string(forKey: "pendingCaptureTitle")
+
+        defaults?.removeObject(forKey: "pendingCaptureURL")
+        defaults?.removeObject(forKey: "pendingCaptureTitle")
+    }
 }

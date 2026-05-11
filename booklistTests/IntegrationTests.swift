@@ -28,7 +28,7 @@ private func makeSyncDecoder() -> JSONDecoder {
 }
 
 /// Encodes `syncData` and writes it to a unique temp file. Caller must delete.
-private func writeTempSyncFile(_ syncData: SyncService.SyncData) throws -> URL {
+private func writeTempSyncFile(_ syncData: SyncData) throws -> URL {
     let data = try makeSyncEncoder().encode(syncData)
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("test-sync-\(UUID().uuidString).json")
@@ -37,9 +37,9 @@ private func writeTempSyncFile(_ syncData: SyncService.SyncData) throws -> URL {
 }
 
 /// Reads and decodes a SyncData snapshot from `url`.
-private func readSyncFile(at url: URL) throws -> SyncService.SyncData {
+private func readSyncFile(at url: URL) throws -> SyncData {
     let data = try Data(contentsOf: url)
-    return try makeSyncDecoder().decode(SyncService.SyncData.self, from: data)
+    return try makeSyncDecoder().decode(SyncData.self, from: data)
 }
 
 // MARK: - Suite 1: SyncService file I/O
@@ -218,7 +218,7 @@ struct SyncFileIOTests {
             try JSONSerialization.jsonObject(with: Data(contentsOf: fileURL)) as? [String: Any]
         )
         let version = try #require(json["version"] as? Int)
-        #expect(version == SyncService.SyncData.currentVersion)
+        #expect(version == SyncData.currentVersion)
     }
 }
 

@@ -9,7 +9,7 @@ import AppKit
 ///      the user switches to booklist, at which point the app reads it on activation.
 final class ShareViewController: NSViewController {
 
-    private static let appGroupID   = "group.com.ivanlepi.booklist"
+    private static let appGroupID   = "group.lepi.booklist"
     private static let urlKey       = "pendingCaptureURL"
     private static let titleKey     = "pendingCaptureTitle"
 
@@ -58,13 +58,15 @@ final class ShareViewController: NSViewController {
                 $0.hasItemConformingToTypeIdentifier("public.url")
             })
         else {
-            complete()
+            complete(launchApp: false)
             return
         }
 
         provider.loadObject(ofClass: NSURL.self) { [weak self] result, _ in
-            defer { self?.complete() }
-            guard let url = result as? URL else { return }
+            guard let url = result as? URL else {
+                self?.complete(launchApp: false)
+                return
+            }
 
             let title = (self?.extensionContext?.inputItems.first as? NSExtensionItem)?
                 .attributedContentText?.string ?? ""
@@ -75,18 +77,26 @@ final class ShareViewController: NSViewController {
             defaults?.set(title.isEmpty ? nil : title, forKey: ShareViewController.titleKey)
             defaults?.synchronize()
 
-            // ── Best-effort: ping the main app to bring it forward ──
-            // This may be blocked by the extension sandbox on some macOS versions;
-            // if so, the user opens booklist manually and the URL is waiting in UserDefaults.
-            if let ping = URL(string: "booklist://capture") {
-                NSWorkspace.shared.open(ping)
-            }
+            // Dismiss the share sheet first; activate booklist in the completion handler
+            // so macOS doesn't return focus to the originating app after sheet dismissal.
+            self?.complete(launchApp: true)
         }
     }
 
-    private func complete() {
+    /// Completes the extension request. If `launchApp` is true, activates (or launches)
+    /// booklist inside the completion handler — i.e. after the share sheet is fully gone.
+    private func complete(launchApp: Bool) {
         DispatchQueue.main.async { [weak self] in
-            self?.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            self?.extensionContext?.completeRequest(returningItems: []) { _ in
+                guard launchApp else { return }
+                let bundleID = "lepi.booklist"
+                if let running = NSRunningApplication
+                    .runningApplications(withBundleIdentifier: bundleID).first {
+                    running.activate(options: [])
+                } else if let ping = URL(string: "booklist://capture") {
+                    NSWorkspace.shared.open(ping)
+                }
+            }
         }
     }
 }

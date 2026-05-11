@@ -6,20 +6,104 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		178314BA2F97650300922140 /* booklist share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 178314AE2F97650300922140 /* booklist share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		178314B82F97650300922140 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 178314522F94F46300922140 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 178314AD2F97650300922140;
+			remoteInfo = "booklist share";
+		};
+		178314DD2FA153BE00922140 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 178314522F94F46300922140 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 178314592F94F46300922140;
+			remoteInfo = booklist;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		178314BF2F97650300922140 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				178314BA2F97650300922140 /* booklist share.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		1783145A2F94F46300922140 /* booklist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = booklist.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		178314AE2F97650300922140 /* booklist share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "booklist share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		178314D92FA153BE00922140 /* booklistTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = booklistTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		178314A92F97632100922140 /* Exceptions for "booklist" folder in "booklist" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 178314592F94F46300922140 /* booklist */;
+		};
+		178314BE2F97650300922140 /* Exceptions for "booklist share" folder in "booklist share" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 178314AD2F97650300922140 /* booklist share */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1783145C2F94F46300922140 /* booklist */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				178314A92F97632100922140 /* Exceptions for "booklist" folder in "booklist" target */,
+			);
 			path = booklist;
+			sourceTree = "<group>";
+		};
+		178314AF2F97650300922140 /* booklist share */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				178314BE2F97650300922140 /* Exceptions for "booklist share" folder in "booklist share" target */,
+			);
+			path = "booklist share";
+			sourceTree = "<group>";
+		};
+		178314DA2FA153BE00922140 /* booklistTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = booklistTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		178314572F94F46300922140 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		178314AB2F97650300922140 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		178314D62FA153BE00922140 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +117,8 @@
 			isa = PBXGroup;
 			children = (
 				1783145C2F94F46300922140 /* booklist */,
+				178314AF2F97650300922140 /* booklist share */,
+				178314DA2FA153BE00922140 /* booklistTests */,
 				1783145B2F94F46300922140 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +127,8 @@
 			isa = PBXGroup;
 			children = (
 				1783145A2F94F46300922140 /* booklist.app */,
+				178314AE2F97650300922140 /* booklist share.appex */,
+				178314D92FA153BE00922140 /* booklistTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,10 +143,12 @@
 				178314562F94F46300922140 /* Sources */,
 				178314572F94F46300922140 /* Frameworks */,
 				178314582F94F46300922140 /* Resources */,
+				178314BF2F97650300922140 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				178314B92F97650300922140 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				1783145C2F94F46300922140 /* booklist */,
@@ -69,6 +159,51 @@
 			productName = booklist;
 			productReference = 1783145A2F94F46300922140 /* booklist.app */;
 			productType = "com.apple.product-type.application";
+		};
+		178314AD2F97650300922140 /* booklist share */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 178314BB2F97650300922140 /* Build configuration list for PBXNativeTarget "booklist share" */;
+			buildPhases = (
+				178314AA2F97650300922140 /* Sources */,
+				178314AB2F97650300922140 /* Frameworks */,
+				178314AC2F97650300922140 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				178314AF2F97650300922140 /* booklist share */,
+			);
+			name = "booklist share";
+			packageProductDependencies = (
+			);
+			productName = "booklist share";
+			productReference = 178314AE2F97650300922140 /* booklist share.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		178314D82FA153BE00922140 /* booklistTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 178314DF2FA153BE00922140 /* Build configuration list for PBXNativeTarget "booklistTests" */;
+			buildPhases = (
+				178314D52FA153BE00922140 /* Sources */,
+				178314D62FA153BE00922140 /* Frameworks */,
+				178314D72FA153BE00922140 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				178314DE2FA153BE00922140 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				178314DA2FA153BE00922140 /* booklistTests */,
+			);
+			name = booklistTests;
+			packageProductDependencies = (
+			);
+			productName = booklistTests;
+			productReference = 178314D92FA153BE00922140 /* booklistTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -82,6 +217,13 @@
 				TargetAttributes = {
 					178314592F94F46300922140 = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					178314AD2F97650300922140 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					178314D82FA153BE00922140 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 178314592F94F46300922140;
 					};
 				};
 			};
@@ -100,12 +242,28 @@
 			projectRoot = "";
 			targets = (
 				178314592F94F46300922140 /* booklist */,
+				178314AD2F97650300922140 /* booklist share */,
+				178314D82FA153BE00922140 /* booklistTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		178314582F94F46300922140 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		178314AC2F97650300922140 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		178314D72FA153BE00922140 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +280,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		178314AA2F97650300922140 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		178314D52FA153BE00922140 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		178314B92F97650300922140 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 178314AD2F97650300922140 /* booklist share */;
+			targetProxy = 178314B82F97650300922140 /* PBXContainerItemProxy */;
+		};
+		178314DE2FA153BE00922140 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 178314592F94F46300922140 /* booklist */;
+			targetProxy = 178314DD2FA153BE00922140 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		178314652F94F46400922140 /* Debug */ = {
@@ -248,13 +433,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = booklist/booklist.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y353HV2V83;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = booklist/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -278,13 +476,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = booklist/booklist.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y353HV2V83;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = booklist/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -300,6 +511,110 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		178314BC2F97650300922140 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "booklist share/booklist share.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y353HV2V83;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "booklist share/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "booklist share";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "lepi.booklist.booklist-share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		178314BD2F97650300922140 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "booklist share/booklist share.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y353HV2V83;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "booklist share/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "booklist share";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "lepi.booklist.booklist-share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		178314E02FA153BE00922140 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y353HV2V83;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklist.booklistTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/booklist.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/booklist";
+			};
+			name = Debug;
+		};
+		178314E12FA153BE00922140 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y353HV2V83;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklist.booklistTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/booklist.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/booklist";
 			};
 			name = Release;
 		};
@@ -320,6 +635,24 @@
 			buildConfigurations = (
 				178314682F94F46400922140 /* Debug */,
 				178314692F94F46400922140 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		178314BB2F97650300922140 /* Build configuration list for PBXNativeTarget "booklist share" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				178314BC2F97650300922140 /* Debug */,
+				178314BD2F97650300922140 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		178314DF2FA153BE00922140 /* Build configuration list for PBXNativeTarget "booklistTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				178314E02FA153BE00922140 /* Debug */,
+				178314E12FA153BE00922140 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,4 +1,22 @@
 import SwiftUI
+import AppKit
+
+// MARK: - Focus ring modifier
+
+extension View {
+    /// Overlays a 1.5 pt accent-coloured border when `isFocused` is true.
+    /// Apply this to the container wrapping a `.textFieldStyle(.plain)` field.
+    func focusRing(when isFocused: Bool, cornerRadius: CGFloat = 8) -> some View {
+        overlay {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .strokeBorder(
+                    isFocused ? Color.accentColor.opacity(0.75) : Color.clear,
+                    lineWidth: 1.5
+                )
+        }
+        .animation(.easeInOut(duration: 0.15), value: isFocused)
+    }
+}
 
 extension Color {
     /// Initialise a Color from a hex string such as "#FF6B6B" or "FF6B6B".
@@ -24,5 +42,14 @@ extension Color {
             blue: Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+
+    /// Converts this Color to a "#RRGGBB" hex string. Returns nil if the color space conversion fails.
+    func toHex() -> String? {
+        guard let nsColor = NSColor(self).usingColorSpace(.sRGB) else { return nil }
+        let r = Int(round(nsColor.redComponent * 255))
+        let g = Int(round(nsColor.greenComponent * 255))
+        let b = Int(round(nsColor.blueComponent * 255))
+        return String(format: "#%02X%02X%02X", r, g, b)
     }
 }

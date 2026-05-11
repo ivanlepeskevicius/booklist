@@ -10,7 +10,6 @@ struct SidebarView: View {
     @Environment(\.modelContext) private var modelContext
 
     // Toolbar / new root folder
-    @State private var showingCapture   = false
     @State private var showingAddFolder = false
 
     // Context menu — Add Subfolder
@@ -28,7 +27,11 @@ struct SidebarView: View {
     @State private var isInboxDropTargeted = false
 
     private var inboxCount: Int {
-        allBookmarks.filter { $0.collection == nil }.count
+        allBookmarks.filter { $0.collection == nil && $0.itemType == .bookmark }.count
+    }
+
+    private var wishlistCount: Int {
+        allBookmarks.filter { $0.collection == nil && $0.itemType == .wishlistItem }.count
     }
 
     private var rootFolders: [Folder] {
@@ -40,6 +43,8 @@ struct SidebarView: View {
             Label("Inbox", systemImage: "tray")
                 .badge(inboxCount)
                 .tag(SidebarSelection.inbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
                 .dropDestination(for: BookmarkTransfer.self) { items, _ in
                     assignBookmarks(ids: items.flatMap { $0.ids }, to: nil)
                     return true
@@ -47,19 +52,19 @@ struct SidebarView: View {
                 .overlay {
                     if isInboxDropTargeted {
                         RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(.accentColor, lineWidth: 2)
+                            .strokeBorder(Color.accentColor, lineWidth: 2)
                             .allowsHitTesting(false)
                     }
                 }
+
+            Label("Wishlist", systemImage: "cart")
+                .badge(wishlistCount)
+                .tag(SidebarSelection.wishlist)
 
             Label("All", systemImage: "square.stack")
                 .tag(SidebarSelection.all)
 
             Section {
-                ForEach(rootFolders) { folder in
-                    FolderRowView(folder: folder, allFolders: allFolders, selection: $selection)
-                }
-
                 Button {
                     showingAddFolder = true
                 } label: {
@@ -68,16 +73,16 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .selectionDisabled()
+
+                ForEach(rootFolders) { folder in
+                    FolderRowView(folder: folder, allFolders: allFolders, selection: $selection)
+                }
             } header: {
                 Text("Library")
             }
         }
         .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(min: 200, ideal: 230)
-        // Provide the drop handler to all FolderRowView descendants via the environment.
-        .environment(\.assignBookmarksToFolder) { ids, folderID in
-            assignBookmarks(ids: ids, to: folderID)
-        }
         // Context menus identified by row tag — correctly distinguishes nested folders.
         .contextMenu(forSelectionType: SidebarSelection.self) { selections in
             if selections.count == 1,
@@ -89,6 +94,18 @@ struct SidebarView: View {
                     isAddingSubfolder = true
                 } label: {
                     Label("Add Subfolder", systemImage: "folder.badge.plus")
+                }
+
+                Divider()
+
+                let folderBookmarks = allBookmarks.filter { $0.collection?.id == folder.id }
+                if !folderBookmarks.isEmpty {
+                    ShareLink(
+                        item: BookmarksExport(bookmarks: folderBookmarks, title: folder.name),
+                        preview: SharePreview(folder.name)
+                    ) {
+                        Label("Share Folder", systemImage: "square.and.arrow.up")
+                    }
                 }
 
                 Divider()
@@ -107,19 +124,6 @@ struct SidebarView: View {
                 }
             }
         } primaryAction: { _ in }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingCapture = true
-                } label: {
-                    Label("New Capture", systemImage: "plus")
-                }
-                .help("Save a new link (⌘N)")
-            }
-        }
-        .sheet(isPresented: $showingCapture) {
-            CaptureView()
-        }
         .sheet(isPresented: $showingAddFolder) {
             FolderFormView(mode: .add(parentID: nil))
         }

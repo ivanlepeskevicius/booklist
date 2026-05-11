@@ -14,6 +14,8 @@ struct BookmarkCardView: View {
     let onOpen: () -> Void
     let onDelete: () -> Void
     let onManage: () -> Void
+    /// Called when the user wants to open the reader view. nil = reader not available (wishlist items).
+    var onRead: (() -> Void)? = nil
     var thumbnailStyle: CardThumbnailStyle = .fill
     /// Whether this card is part of the current selection.
     var isSelected: Bool = false
@@ -21,12 +23,44 @@ struct BookmarkCardView: View {
     var selectedIDs: Set<UUID> = []
     /// Called on tap. Bool = was ⌘ held? (true → toggle, false → select only this).
     var onSelect: (Bool) -> Void = { _ in }
+    /// The bookmarks to export when "Share" is chosen from the context menu.
+    /// If this card is part of a selection, callers pass all selected bookmarks.
+    var shareBookmarks: [Bookmark] = []
 
     @State private var isHovered         = false
     @State private var showDeleteConfirm = false
 
-    @AppStorage("showTitleOnCards") private var showTitleOnCards = true
-    @AppStorage("showDateOnCards")  private var showDateOnCards  = true
+    @AppStorage("showTitleOnCards")   private var showTitleOnCards   = true
+    @AppStorage("showDateOnCards")    private var showDateOnCards    = true
+    @AppStorage("cardFontDesign")     private var cardFontDesign     = "system"
+    @AppStorage("cardFontName")       private var cardFontName       = ""
+    @AppStorage("cardTitleSize")      private var cardTitleSize      = 14.0
+    @AppStorage("cardNoteSize")       private var cardNoteSize       = 12.0
+    @AppStorage("staleDaysThreshold") private var staleDaysThreshold = 90
+
+    private var fontDesign: Font.Design {
+        switch cardFontDesign {
+        case "rounded":    return .rounded
+        case "serif":      return .serif
+        case "monospaced": return .monospaced
+        default:           return .default
+        }
+    }
+
+    private func resolvedFont(size: CGFloat) -> Font {
+        if !cardFontName.isEmpty {
+            return .custom(cardFontName, size: size)
+        }
+        return .system(size: size, design: fontDesign)
+    }
+
+    /// True when a categorised item hasn't been opened within the user-configured threshold.
+    private var isStale: Bool {
+        guard bookmark.collection != nil else { return false }
+        let threshold = Double(staleDaysThreshold) * 86_400
+        let reference = bookmark.lastOpenedDate ?? bookmark.dateAdded
+        return Date().timeIntervalSince(reference) > threshold
+    }
 
     // Drag payload: all selected IDs when dragging a selected card, just this one otherwise.
     private var dragPayload: BookmarkTransfer {
@@ -38,6 +72,27 @@ struct BookmarkCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             thumbnail
+                .overlay(alignment: .topLeading) {
+                    if bookmark.itemType == .wishlistItem {
+                        Image(systemName: "tag.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(Color.accentColor, in: Circle())
+                            .padding(8)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if bookmark.itemType == .wishlistItem,
+                       let price = bookmark.price, !price.isEmpty {
+                        Text(price)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.regularMaterial, in: Capsule())
+                            .padding(8)
+                    }
+                }
             if hasCardBody {
                 cardBody
             }
@@ -53,7 +108,7 @@ struct BookmarkCardView: View {
         .overlay {
             if isSelected {
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(.accentColor, lineWidth: 2)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
             }
         }
         .shadow(
@@ -61,6 +116,24 @@ struct BookmarkCardView: View {
             radius: isHovered ? 10 : 4,
             y: isHovered ? 4 : 2
         )
+        // Status dot — mutually exclusive states share the same corner position:
+        //   Red    = uncategorised (needs to be filed)
+        //   Yellow = categorised but not opened in staleDaysThreshold days
+        .overlay(alignment: .topTrailing) {
+            if bookmark.collection == nil {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 9, height: 9)
+                    .overlay { Circle().stroke(.background, lineWidth: 2) }
+                    .padding(6)
+            } else if isStale {
+                Circle()
+                    .fill(.yellow)
+                    .frame(width: 9, height: 9)
+                    .overlay { Circle().stroke(.background, lineWidth: 2) }
+                    .padding(6)
+            }
+        }
         .overlay(alignment: .top) {
             if isHovered { hoverOverlay }
         }
@@ -71,6 +144,7 @@ struct BookmarkCardView: View {
             let cmdHeld = NSApp.currentEvent?.modifierFlags.contains(.command) ?? false
             onSelect(cmdHeld)
         }
+        .contextMenu { cardContextMenu }
         .draggable(dragPayload)
         .confirmationDialog(
             "Delete \"\(bookmark.title)\"?",
@@ -84,6 +158,29 @@ struct BookmarkCardView: View {
         }
     }
 
+    // MARK: - Context menu
+
+    @ViewBuilder
+    private var cardContextMenu: some View {
+        if let onRead {
+            Button("Open in Reader") { onRead() }
+        }
+        Button("Open in Browser") { onOpen() }
+        Divider()
+        Button("Edit") { onManage() }
+        let targets = shareBookmarks.isEmpty ? [bookmark] : shareBookmarks
+        let shareTitle = targets.count == 1 ? targets[0].title : "\(targets.count) Items"
+        ShareLink(
+            item: BookmarksExport(bookmarks: targets, title: shareTitle),
+            preview: SharePreview(shareTitle)
+        ) {
+            Label(targets.count == 1 ? "Share" : "Share \(targets.count) Items",
+                  systemImage: "square.and.arrow.up")
+        }
+        Divider()
+        Button("Delete", role: .destructive) { showDeleteConfirm = true }
+    }
+
     // MARK: - Thumbnail
 
     @ViewBuilder
@@ -95,19 +192,29 @@ struct BookmarkCardView: View {
                 case .success(let image):
                     switch thumbnailStyle {
                     case .fill:
+                        // Fixed height only — width comes from the parent (grid cell /
+                        // LazyVStack column). Avoid maxWidth:.infinity inside the closure:
+                        // AsyncImage does not reliably propagate the parent's width proposal
+                        // into its phase closure, causing the image to resolve to an
+                        // unbounded width and overflow the card at narrow column widths.
                         image.resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(minHeight: 120, maxHeight: 180)
+                            .frame(height: 160)
                             .clipped()
                     case .fit:
                         image.resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, maxHeight: 500)
+                            .clipped()
                     }
                 default:
                     placeholderImage
                 }
             }
+            // Hard cap on the wrapper itself: second defensive layer in case the
+            // inner frame is bypassed before layout settles.
+            .frame(maxWidth: .infinity, maxHeight: thumbnailStyle == .fill ? 160 : 500)
+            .clipped()
         } else {
             placeholderImage
         }
@@ -147,21 +254,23 @@ struct BookmarkCardView: View {
         VStack(alignment: .leading, spacing: 5) {
             if showTitleOnCards {
                 Text(bookmark.title)
-                    .font(.subheadline)
+                    .font(resolvedFont(size: cardTitleSize))
                     .fontWeight(.medium)
                     .lineLimit(2)
             }
 
             if let note = bookmark.note, !note.isEmpty {
                 Text(note)
-                    .font(.caption)
+                    .font(resolvedFont(size: cardNoteSize))
                     .foregroundStyle(.secondary)
                     .lineLimit(5)
             }
 
+            Spacer(minLength: 0)
+
             if showDateOnCards {
                 Text(bookmark.dateAdded.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption2)
+                    .font(resolvedFont(size: 10))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -172,9 +281,12 @@ struct BookmarkCardView: View {
 
     private var hoverOverlay: some View {
         HStack(spacing: 6) {
+            if let onRead {
+                actionButton("eyeglasses", "Reader view", action: onRead)
+            }
             actionButton("arrow.up.right.square", "Open",   action: onOpen)
-            actionButton("trash",                 "Delete") { showDeleteConfirm = true }
             actionButton("slider.horizontal.3",   "Edit",   action: onManage)
+            actionButton("trash",                 "Delete") { showDeleteConfirm = true }
         }
         .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))

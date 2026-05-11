@@ -32,7 +32,7 @@ struct ExportService {
         }
     }
 
-    static func generateHTML(items: [ExportItem], title: String) -> String {
+    nonisolated static func generateHTML(items: [ExportItem], title: String) -> String {
         let jsonData  = (try? JSONEncoder().encode(items)) ?? Data()
         let jsonStr   = String(data: jsonData, encoding: .utf8) ?? "[]"
         let itemCount = items.count
@@ -64,7 +64,7 @@ struct ExportService {
 
     // MARK: - Private helpers
 
-    private static func cardHTML(_ item: ExportItem) -> String {
+    private nonisolated static func cardHTML(_ item: ExportItem) -> String {
         let imgTag   = item.imageURL.map {
             "<img src=\"\(esc($0))\" alt=\"\" class=\"card-img\" loading=\"lazy\">"
         } ?? ""
@@ -88,7 +88,7 @@ struct ExportService {
         """
     }
 
-    private static func esc(_ s: String) -> String {
+    private nonisolated static func esc(_ s: String) -> String {
         s.replacingOccurrences(of: "&",  with: "&amp;")
          .replacingOccurrences(of: "<",  with: "&lt;")
          .replacingOccurrences(of: ">",  with: "&gt;")
@@ -96,7 +96,7 @@ struct ExportService {
     }
 
     // Minified CSS for the exported HTML page
-    private static let css = """
+    private nonisolated static let css = """
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f5f7;color:#1d1d1f;-webkit-font-smoothing:antialiased}
         header{padding:48px 24px 24px;text-align:center}

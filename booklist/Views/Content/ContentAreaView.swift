@@ -6,12 +6,24 @@ struct ContentAreaView: View {
 
     @Query(sort: \Bookmark.dateAdded, order: .reverse) private var allBookmarks: [Bookmark]
     @Query private var allFolders: [Folder]
+    @Query(sort: \Tag.name) private var allTags: [Tag]
 
-    @State private var searchText     = ""
-    @State private var sortOption     = SortOption.recent
-    @State private var viewMode       = ViewMode.masonry
+    @Environment(CaptureRouter.self) private var captureRouter
+
+    @State private var showingCapture = false
+    @State private var showingImport  = false
+
+    @State private var searchText          = ""
+    @State private var sortOption          = SortOption.recent
+    @State private var viewMode            = ViewMode.masonry
     @State private var managingBookmark: Bookmark?
+    @State private var readerBookmark: Bookmark?
     @State private var selectedBookmarkIDs: Set<UUID> = []
+    @State private var selectedTagIDs: Set<UUID>      = []
+    /// Changes each time the user picks "Random", producing a new stable shuffle order.
+    @State private var shuffleNonce        = 0
+
+    @FocusState private var isSearchFocused: Bool
 
     @AppStorage("showTitleOnCards") private var showTitleOnCards = true
     @AppStorage("showDateOnCards")  private var showDateOnCards  = true
@@ -21,6 +33,7 @@ struct ContentAreaView: View {
     private var navigationTitle: String {
         switch selection {
         case .inbox:          return "Inbox"
+        case .wishlist:       return "Wishlist"
         case .all:            return "All"
         case .folder(let id): return allFolders.first { $0.id == id }?.name ?? "Folder"
         }
@@ -31,14 +44,25 @@ struct ContentAreaView: View {
         var result: [Bookmark]
         switch selection {
         case .inbox:
-            result = allBookmarks.filter { $0.collection == nil }
+            // Only regular bookmarks with no folder
+            result = allBookmarks.filter { $0.collection == nil && $0.itemType == .bookmark }
+        case .wishlist:
+            // Only unclassified wishlist items — mirrors Inbox behaviour
+            result = allBookmarks.filter { $0.collection == nil && $0.itemType == .wishlistItem }
         case .all:
             result = allBookmarks
         case .folder(let id):
             result = allBookmarks.filter { $0.collection?.id == id }
         }
 
-        // 2. Filter by search text
+        // 2. Filter by selected tags (OR logic — show bookmarks that have any selected tag)
+        if !selectedTagIDs.isEmpty {
+            result = result.filter { bm in
+                bm.tags.contains { selectedTagIDs.contains($0.id) }
+            }
+        }
+
+        // 3. Filter by search text
         if !searchText.isEmpty {
             let q = searchText.lowercased()
             result = result.filter {
@@ -49,11 +73,29 @@ struct ContentAreaView: View {
             }
         }
 
-        // 3. Apply sort
+        // 4. Apply sort
         switch sortOption {
         case .recent:       break
+        case .lastOpened:
+            // Most recently opened first; never-opened items sink to the bottom,
+            // ordered by date added among themselves.
+            result.sort { a, b in
+                switch (a.lastOpenedDate, b.lastOpenedDate) {
+                case (let d1?, let d2?): return d1 > d2
+                case (_?, nil):         return true
+                case (nil, _?):         return false
+                case (nil, nil):        return a.dateAdded > b.dateAdded
+                }
+            }
         case .alphabetical: result.sort { $0.title.localizedCompare($1.title) == .orderedAscending }
-        case .random:       result.shuffle()
+        case .random:
+            // Stable hash-based shuffle: same nonce → same order every render.
+            // shuffleNonce is bumped each time the user picks "Random".
+            result.sort { a, b in
+                var h0 = Hasher(); h0.combine(a.id); h0.combine(shuffleNonce)
+                var h1 = Hasher(); h1.combine(b.id); h1.combine(shuffleNonce)
+                return h0.finalize() < h1.finalize()
+            }
         }
 
         return result
@@ -62,18 +104,96 @@ struct ContentAreaView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
-            Divider()
-            content
+        HStack(spacing: 0) {
+            // Main content area
+            VStack(spacing: 0) {
+                toolbar
+                Divider()
+                if !allTags.isEmpty {
+                    tagFilterBar
+                    Divider()
+                }
+                content
+            }
+
+            // Inline reader panel — slides in from the right
+            if let bookmark = readerBookmark {
+                Divider()
+                ReaderView(bookmark: bookmark, onClose: { readerBookmark = nil })
+                    .frame(width: 460)
+                    .id(bookmark.id)
+                    .transition(.move(edge: .trailing))
+            }
         }
+        .animation(.easeInOut(duration: 0.22), value: readerBookmark != nil)
         .navigationTitle(navigationTitle)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { showingImport = true } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .help("Import bookmarks")
+
+                if !displayedBookmarks.isEmpty {
+                    let shareTargets = selectedBookmarkIDs.isEmpty
+                        ? displayedBookmarks
+                        : displayedBookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+                    let shareTitle: String = {
+                        if selectedBookmarkIDs.count == 1,
+                           let bm = displayedBookmarks.first(where: { selectedBookmarkIDs.contains($0.id) }) {
+                            return bm.title
+                        } else if selectedBookmarkIDs.count > 1 {
+                            return "\(selectedBookmarkIDs.count) Items"
+                        }
+                        return navigationTitle
+                    }()
+                    ShareLink(
+                        item: BookmarksExport(bookmarks: shareTargets, title: shareTitle),
+                        preview: SharePreview(shareTitle)
+                    ) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .help(selectedBookmarkIDs.isEmpty
+                          ? "Share \(navigationTitle)"
+                          : "Share \(selectedBookmarkIDs.count) selected item\(selectedBookmarkIDs.count == 1 ? "" : "s")"
+                    )
+                }
+
+                Button { showingCapture = true } label: {
+                    Image(systemName: "plus")
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .help("Save a new link (⌘N)")
+
+                SettingsLink {
+                    Image(systemName: "gear")
+                }
+                .help("Settings (⌘,)")
+            }
+        }
         .sheet(item: $managingBookmark) { bookmark in
             ManagePanelView(bookmark: bookmark)
+        }
+        .sheet(isPresented: $showingCapture, onDismiss: {
+            captureRouter.pendingURL   = nil
+            captureRouter.pendingTitle = nil
+        }) {
+            CaptureView(
+                initialURL:   captureRouter.pendingURL   ?? "",
+                initialTitle: captureRouter.pendingTitle ?? ""
+            )
+        }
+        .sheet(isPresented: $showingImport) {
+            ImportView()
         }
         // Clear selection when navigating to a different sidebar item.
         .onChange(of: selection) {
             selectedBookmarkIDs = []
+            selectedTagIDs = []
+        }
+        // Auto-open capture when a URL arrives from the Share Extension / deep link.
+        .onChange(of: captureRouter.pendingURL) { _, newURL in
+            if newURL != nil { showingCapture = true }
         }
     }
 
@@ -88,6 +208,7 @@ struct ContentAreaView: View {
                     .frame(width: 16)
                 TextField("Search in \(navigationTitle)…", text: $searchText)
                     .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
                 if !searchText.isEmpty {
                     Button { searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -98,12 +219,15 @@ struct ContentAreaView: View {
             }
             .padding(8)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .focusRing(when: isSearchFocused)
 
             // Sort picker
             Menu {
                 ForEach(SortOption.allCases, id: \.self) { option in
                     Button {
                         sortOption = option
+                        // Each tap of "Random" produces a new shuffle order.
+                        if option == .random { shuffleNonce += 1 }
                     } label: {
                         if sortOption == option {
                             Label(option.rawValue, systemImage: "checkmark")
@@ -127,7 +251,7 @@ struct ContentAreaView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 100)
+            .frame(width: 68)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -139,37 +263,73 @@ struct ContentAreaView: View {
     private var content: some View {
         if displayedBookmarks.isEmpty {
             emptyState
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             switch viewMode {
             case .masonry:
                 MasonryView(
                     bookmarks: displayedBookmarks,
                     onManage: { managingBookmark = $0 },
-                    selectedIDs: $selectedBookmarkIDs
-                )
-            case .grid:
-                GridView(
-                    bookmarks: displayedBookmarks,
-                    onManage: { managingBookmark = $0 },
+                    onRead:   { readerBookmark   = $0 },
                     selectedIDs: $selectedBookmarkIDs
                 )
             case .list:
                 BookmarkListView(
                     bookmarks: displayedBookmarks,
                     onManage: { managingBookmark = $0 },
-                    selectedIDs: $selectedBookmarkIDs
+                    onRead:   { readerBookmark   = $0 },
+                    selectedIDs: $selectedBookmarkIDs,
+                    onTagTap: { tag in
+                        if selectedTagIDs.contains(tag.id) { selectedTagIDs.remove(tag.id) }
+                        else { selectedTagIDs.insert(tag.id) }
+                    }
                 )
             }
         }
     }
 
+    // MARK: - Tag filter bar
+
+    private var tagFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(allTags) { tag in
+                    let isSelected = selectedTagIDs.contains(tag.id)
+                    Button {
+                        if isSelected { selectedTagIDs.remove(tag.id) }
+                        else { selectedTagIDs.insert(tag.id) }
+                    } label: {
+                        Text("#\(tag.name)")
+                            .font(.caption)
+                            .fontWeight(isSelected ? .semibold : .regular)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(
+                                isSelected
+                                    ? Color(hex: tag.color)
+                                    : Color(hex: tag.color).opacity(0.12),
+                                in: Capsule()
+                            )
+                            .foregroundStyle(isSelected ? .white : Color(hex: tag.color))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 7)
+        }
+    }
+
     private var emptyState: some View {
-        ContentUnavailableView(
+        let isWishlist = selection == .wishlist
+        return ContentUnavailableView(
             searchText.isEmpty ? "Nothing here yet" : "No results",
-            systemImage: searchText.isEmpty ? "bookmark" : "magnifyingglass",
+            systemImage: searchText.isEmpty
+                ? (isWishlist ? "cart" : "bookmark")
+                : "magnifyingglass",
             description: Text(
                 searchText.isEmpty
-                ? "Save your first link to get started."
+                ? (isWishlist ? "Save your first wishlist item to get started." : "Save your first link to get started.")
                 : "Try a different search term."
             )
         )

@@ -88,27 +88,26 @@ struct ExportServiceTests {
     @Test("Note element is rendered when note is non-nil")
     func noteRenderedWhenPresent() {
         let html = ExportService.generateHTML(items: [item(note: "Great resource")], title: "T")
-        #expect(html.contains("card-note"))
-        #expect(html.contains("Great resource"))
+        // Use the full tag — the CSS stylesheet always contains ".card-note{...}" so class name alone is ambiguous
+        #expect(html.contains("<p class=\"card-note\">Great resource</p>"))
     }
 
     @Test("Note element is absent when note is nil")
     func noteAbsentWhenNil() {
         let html = ExportService.generateHTML(items: [item(note: nil)], title: "T")
-        #expect(!html.contains("card-note"))
+        #expect(!html.contains("<p class=\"card-note\">"))
     }
 
     @Test("Price element is rendered when price is non-nil")
     func priceRenderedWhenPresent() {
         let html = ExportService.generateHTML(items: [item(price: "$29.99")], title: "T")
-        #expect(html.contains("card-price"))
-        #expect(html.contains("$29.99"))
+        #expect(html.contains("<span class=\"card-price\">$29.99</span>"))
     }
 
     @Test("Price element is absent when price is nil")
     func priceAbsentWhenNil() {
         let html = ExportService.generateHTML(items: [item(price: nil)], title: "T")
-        #expect(!html.contains("card-price"))
+        #expect(!html.contains("<span class=\"card-price\">"))
     }
 
     @Test("Image tag is rendered when imageURL is non-nil")
@@ -156,25 +155,26 @@ struct ExportServiceTests {
 
     // MARK: - HTML escaping
 
-    @Test("Ampersand in title is escaped to &amp;")
+    @Test("Ampersand in title is escaped to &amp; in card body")
     func escapeAmpersand() {
         let html = ExportService.generateHTML(items: [item(title: "Cats & Dogs")], title: "T")
-        #expect(html.contains("Cats &amp; Dogs"))
-        #expect(!html.contains("Cats & Dogs"))
+        // The card-title div must be escaped; raw '&' may legitimately appear in the embedded JSON
+        #expect(html.contains("<div class=\"card-title\">Cats &amp; Dogs</div>"))
+        #expect(!html.contains("<div class=\"card-title\">Cats & Dogs</div>"))
     }
 
-    @Test("Less-than in title is escaped to &lt;")
+    @Test("Less-than in title is escaped to &lt; in card body")
     func escapeLessThan() {
         let html = ExportService.generateHTML(items: [item(title: "A < B")], title: "T")
-        #expect(html.contains("A &lt; B"))
-        #expect(!html.contains("A < B"))
+        #expect(html.contains("<div class=\"card-title\">A &lt; B</div>"))
+        #expect(!html.contains("<div class=\"card-title\">A < B</div>"))
     }
 
-    @Test("Greater-than in title is escaped to &gt;")
+    @Test("Greater-than in title is escaped to &gt; in card body")
     func escapeGreaterThan() {
         let html = ExportService.generateHTML(items: [item(title: "B > A")], title: "T")
-        #expect(html.contains("B &gt; A"))
-        #expect(!html.contains("B > A"))
+        #expect(html.contains("<div class=\"card-title\">B &gt; A</div>"))
+        #expect(!html.contains("<div class=\"card-title\">B > A</div>"))
     }
 
     @Test("Double-quote in note is escaped to &quot;")

@@ -6,13 +6,31 @@ import SwiftData
 struct MasonryView: View {
     let bookmarks: [Bookmark]
     let onManage: (Bookmark) -> Void
+    let onRead: (Bookmark) -> Void
     @Binding var selectedIDs: Set<UUID>
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("cardSizeScale") private var cardSizeScale = 1.0
+    @State private var availableWidth: CGFloat = 0
 
-    private let columnCount = 3
     private let spacing: CGFloat = 12
     private let padding: CGFloat = 16
+
+    /// Fewer, wider columns = bigger cards; more, narrower columns = smaller cards.
+    private var columnCount: Int {
+        switch cardSizeScale {
+        case ..<0.80: return 5
+        case ..<0.95: return 4
+        case ..<1.15: return 3  // default
+        case ..<1.35: return 2
+        default:      return 1
+        }
+    }
+
+    private var columnWidth: CGFloat {
+        guard availableWidth > 0 else { return 200 }
+        return (availableWidth - padding * 2 - spacing * CGFloat(columnCount - 1)) / CGFloat(columnCount)
+    }
 
     var body: some View {
         ScrollView {
@@ -25,17 +43,34 @@ struct MasonryView: View {
                                 onOpen:   { open(bookmark) },
                                 onDelete: { delete(bookmark) },
                                 onManage: { onManage(bookmark) },
+                                onRead:   bookmark.itemType == .bookmark ? { onRead(bookmark) } : nil,
                                 thumbnailStyle: .fit,
                                 isSelected: selectedIDs.contains(bookmark.id),
                                 selectedIDs: selectedIDs,
-                                onSelect: { cmdHeld in select(bookmark.id, cmdHeld: cmdHeld) }
+                                onSelect: { cmdHeld in select(bookmark.id, cmdHeld: cmdHeld) },
+                                shareBookmarks: shareTargets(for: bookmark)
                             )
                         }
                     }
+                    .frame(width: availableWidth > 0 ? columnWidth : nil)
                 }
             }
             .padding(padding)
         }
+        // onGeometryChange reads geometry post-layout (not during it), avoiding the
+        // layout feedback loop that GeometryReader caused when wrapping a ScrollView
+        // with LazyVStack columns — which was hanging the main thread for 40–127 seconds.
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { newWidth in
+            availableWidth = newWidth
+        }
+    }
+
+    /// Returns the bookmarks that should be shared when the context menu is invoked on `bookmark`.
+    /// If the card is part of the current selection, shares all selected; otherwise just this one.
+    private func shareTargets(for bookmark: Bookmark) -> [Bookmark] {
+        selectedIDs.contains(bookmark.id)
+            ? bookmarks.filter { selectedIDs.contains($0.id) }
+            : [bookmark]
     }
 
     private func columnBookmarks(_ col: Int) -> [Bookmark] {
@@ -56,6 +91,7 @@ struct MasonryView: View {
 
     private func open(_ bookmark: Bookmark) {
         guard let url = URL(string: bookmark.url) else { return }
+        bookmark.lastOpenedDate = Date()
         NSWorkspace.shared.open(url)
     }
 

@@ -5,11 +5,19 @@ import SwiftData
 struct BookmarkListView: View {
     let bookmarks: [Bookmark]
     let onManage: (Bookmark) -> Void
+    let onRead: (Bookmark) -> Void
     @Binding var selectedIDs: Set<UUID>
+    var onTagTap: ((Tag) -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @State private var sortOrder = [KeyPathComparator<Bookmark>(\Bookmark.dateAdded, order: .reverse)]
     @State private var showDeleteConfirmFor: Bookmark?
+
+    @AppStorage("listShowSource")     private var listShowSource     = true
+    @AppStorage("listShowSaved")      private var listShowSaved      = true
+    @AppStorage("listShowLastOpened") private var listShowLastOpened = true
+    @AppStorage("listShowPrice")      private var listShowPrice      = true
+    @AppStorage("listShowTags")       private var listShowTags       = true
 
     private var sortedBookmarks: [Bookmark] {
         bookmarks.sorted(using: sortOrder)
@@ -22,9 +30,17 @@ struct BookmarkListView: View {
                 HStack(spacing: 8) {
                     faviconView(bookmark)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(bookmark.title)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
+                        Button {
+                            guard let url = URL(string: bookmark.url) else { return }
+                            bookmark.lastOpenedDate = Date()
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            Text(bookmark.title)
+                                .fontWeight(.medium)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.link)
+
                         if let note = bookmark.note, !note.isEmpty {
                             Text(note)
                                 .font(.caption)
@@ -41,26 +57,94 @@ struct BookmarkListView: View {
                 )
             }
 
-            // Domain column (sortable by url)
-            TableColumn("Source", value: \Bookmark.url) { bookmark in
-                Text(URL(string: bookmark.url)?.host ?? "—")
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            if listShowSource {
+                // Domain column (sortable by url)
+                TableColumn("Source", value: \Bookmark.url) { bookmark in
+                    Text(URL(string: bookmark.url)?.host ?? "—")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .width(min: 80, ideal: 140, max: 180)
             }
-            .width(min: 80, ideal: 140, max: 180)
 
-            // Date column (sortable by dateAdded)
-            TableColumn("Saved", value: \Bookmark.dateAdded) { bookmark in
-                Text(bookmark.dateAdded.formatted(date: .abbreviated, time: .omitted))
-                    .foregroundStyle(.secondary)
+            if listShowSaved {
+                // Date column (sortable by dateAdded)
+                TableColumn("Saved", value: \Bookmark.dateAdded) { bookmark in
+                    Text(bookmark.dateAdded.formatted(date: .abbreviated, time: .omitted))
+                        .foregroundStyle(.secondary)
+                }
+                .width(90)
             }
-            .width(90)
+
+            if listShowLastOpened {
+                // Last Opened column (sortable via lastOpenedDateForSorting proxy)
+                TableColumn("Last Opened", value: \Bookmark.lastOpenedDateForSorting) { bookmark in
+                    if let date = bookmark.lastOpenedDate {
+                        Text(date.formatted(date: .abbreviated, time: .omitted))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Never")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .width(min: 80, ideal: 110, max: 130)
+            }
+
+            if listShowPrice {
+                // Price column — only populated for wishlist items
+                TableColumn("Price") { bookmark in
+                    if bookmark.itemType == .wishlistItem, let price = bookmark.price, !price.isEmpty {
+                        Text(price)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .width(min: 60, ideal: 90, max: 120)
+            }
+
+            if listShowTags {
+                TableColumn("Tags", value: \Bookmark.tagSortKey) { bookmark in
+                    if !bookmark.tags.isEmpty {
+                        HStack(spacing: 3) {
+                            ForEach(bookmark.tags.prefix(3)) { tag in
+                                Button { onTagTap?(tag) } label: {
+                                    Text("#\(tag.name)")
+                                        .font(.caption2)
+                                        .lineLimit(1)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color(hex: tag.color).opacity(0.15),
+                                                    in: Capsule())
+                                        .foregroundStyle(Color(hex: tag.color))
+                                }
+                                .buttonStyle(.plain)
+                                .help("Filter by #\(tag.name)")
+                            }
+                            if bookmark.tags.count > 3 {
+                                Text("+\(bookmark.tags.count - 3)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .width(min: 80, ideal: 160, max: 200)
+            }
 
             // Actions column (not sortable)
             TableColumn("") { bookmark in
                 HStack(spacing: 2) {
+                    if bookmark.itemType == .bookmark {
+                        Button { onRead(bookmark) } label: {
+                            Image(systemName: "eyeglasses")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Reader view")
+                    }
+
                     Button {
                         guard let url = URL(string: bookmark.url) else { return }
+                        bookmark.lastOpenedDate = Date()
                         NSWorkspace.shared.open(url)
                     } label: {
                         Image(systemName: "arrow.up.right.square")
@@ -84,8 +168,21 @@ struct BookmarkListView: View {
                     .help("Delete")
                 }
             }
-            .width(76)
+            .width(100)
         }
+        .contextMenu(forSelectionType: UUID.self) { selection in
+            let targets = bookmarks.filter { selection.contains($0.id) }
+            if !targets.isEmpty {
+                let shareTitle = targets.count == 1 ? targets[0].title : "\(targets.count) Items"
+                ShareLink(
+                    item: BookmarksExport(bookmarks: targets, title: shareTitle),
+                    preview: SharePreview(shareTitle)
+                ) {
+                    Label(targets.count == 1 ? "Share" : "Share \(targets.count) Items",
+                          systemImage: "square.and.arrow.up")
+                }
+            }
+        } primaryAction: { _ in }
         .confirmationDialog(
             "Delete \"\(showDeleteConfirmFor?.title ?? "")\"?",
             isPresented: Binding(

@@ -1,10 +1,16 @@
 import SwiftUI
+import SwiftData
 import ServiceManagement
 
 struct AppSettingsView: View {
-    @AppStorage("cardFontDesign")     private var cardFontDesign     = "system"
-    @AppStorage("cardTextScale")      private var cardTextScale      = 1.0
-    @AppStorage("cardSizeScale")      private var cardSizeScale      = 1.0
+    @Query(sort: \Tag.name) private var allTags: [Tag]
+    @Environment(\.modelContext) private var modelContext
+    @State private var newTagName = ""
+    @AppStorage("cardFontDesign")  private var cardFontDesign  = "system"
+    @AppStorage("cardFontName")    private var cardFontName    = ""
+    @AppStorage("cardTitleSize")   private var cardTitleSize   = 14.0
+    @AppStorage("cardNoteSize")    private var cardNoteSize    = 12.0
+    @AppStorage("cardSizeScale")   private var cardSizeScale   = 1.0
     @AppStorage("appearanceMode")     private var appearanceMode     = "system"
     @AppStorage("showInDock")         private var showInDock         = false
     @AppStorage("preferredCurrency")  private var preferredCurrency  = Locale.current.currency?.identifier ?? "USD"
@@ -13,8 +19,18 @@ struct AppSettingsView: View {
     @AppStorage("listShowSaved")      private var listShowSaved      = true
     @AppStorage("listShowLastOpened") private var listShowLastOpened = true
     @AppStorage("listShowPrice")      private var listShowPrice      = true
+    @AppStorage("listShowTags")       private var listShowTags       = true
 
-    @State private var launchAtLogin = false
+    @State private var launchAtLogin    = false
+    @State private var systemFonts: [String] = []
+    @FocusState private var isNewTagFocused: Bool
+
+    // Sync tab state
+    @AppStorage("syncEnabled") private var syncEnabled = false
+    @State private var syncFolderName       = ""
+    @State private var displayedLastSync: Date? = nil
+    @State private var syncError: String?   = nil
+    @State private var syncSuccess          = false
 
     private let currencies: [(code: String, label: String)] = [
         ("AUD", "AUD – Australian Dollar"),
@@ -35,15 +51,6 @@ struct AppSettingsView: View {
         ("USD", "USD – US Dollar ($)"),
     ]
 
-    private var fontDesign: Font.Design {
-        switch cardFontDesign {
-        case "rounded":    return .rounded
-        case "serif":      return .serif
-        case "monospaced": return .monospaced
-        default:           return .default
-        }
-    }
-
     var body: some View {
         TabView {
             generalTab
@@ -57,10 +64,21 @@ struct AppSettingsView: View {
 
             wishlistTab
                 .tabItem { Label("Wishlist", systemImage: "cart") }
+
+            tagsTab
+                .tabItem { Label("Tags", systemImage: "tag") }
+
+            syncTab
+                .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
         }
         .frame(width: 440, height: 540)
         .onAppear {
-            launchAtLogin = SMAppService.mainApp.status == .enabled
+            launchAtLogin       = SMAppService.mainApp.status == .enabled
+            syncFolderName      = SyncService.syncFolderDisplayName
+            displayedLastSync   = SyncService.lastSyncDate
+            if systemFonts.isEmpty {
+                systemFonts = NSFontManager.shared.availableFontFamilies.sorted()
+            }
         }
     }
 
@@ -120,28 +138,51 @@ struct AppSettingsView: View {
     private var cardsTab: some View {
         Form {
             Section("Typography") {
-                Picker("Font", selection: $cardFontDesign) {
-                    Text("System").tag("system")
-                    Text("Rounded").tag("rounded")
-                    Text("Serif").tag("serif")
-                    Text("Mono").tag("monospaced")
+                Picker("Font", selection: $cardFontName) {
+                    Text("System Default").tag("")
+                    Divider()
+                    ForEach(systemFonts, id: \.self) { name in
+                        Text(name).tag(name)
+                    }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
 
-                LabeledContent("Text size") {
+                if cardFontName.isEmpty {
+                    Picker("Style", selection: $cardFontDesign) {
+                        Text("Default").tag("system")
+                        Text("Rounded").tag("rounded")
+                        Text("Serif").tag("serif")
+                        Text("Mono").tag("monospaced")
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Text("The quick brown fox jumps over the lazy dog")
+                    .font(cardFontName.isEmpty ? .system(size: 13) : .custom(cardFontName, size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .animation(.default, value: cardFontName)
+
+                LabeledContent("Title size") {
                     HStack(spacing: 8) {
-                        Text("A")
-                            .font(.system(size: 11, design: fontDesign))
-                            .foregroundStyle(.secondary)
-                        Slider(value: $cardTextScale, in: 0.75...1.5, step: 0.05)
-                            .frame(width: 180)
-                        Text("A")
-                            .font(.system(size: 16, design: fontDesign))
-                            .foregroundStyle(.secondary)
-                        Text("\(Int((cardTextScale * 100).rounded()))%")
+                        Stepper("", value: $cardTitleSize, in: 10...22, step: 1)
+                            .labelsHidden()
+                        Text("\(Int(cardTitleSize)) pt")
                             .monospacedDigit()
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 36, alignment: .trailing)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 42, alignment: .leading)
+                    }
+                }
+
+                LabeledContent("Note size") {
+                    HStack(spacing: 8) {
+                        Stepper("", value: $cardNoteSize, in: 9...18, step: 1)
+                            .labelsHidden()
+                        Text("\(Int(cardNoteSize)) pt")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 42, alignment: .leading)
                     }
                 }
             }
@@ -173,15 +214,6 @@ struct AppSettingsView: View {
                     }
                 }
             }
-
-            Section("Preview") {
-                HStack {
-                    Spacer()
-                    previewCard
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-            }
         }
         .formStyle(.grouped)
     }
@@ -194,6 +226,7 @@ struct AppSettingsView: View {
                 Toggle("Source", isOn: $listShowSource)
                 Toggle("Saved", isOn: $listShowSaved)
                 Toggle("Last Opened", isOn: $listShowLastOpened)
+                Toggle("Tags", isOn: $listShowTags)
                 Toggle("Price", isOn: $listShowPrice)
             } header: {
                 Text("Visible Columns")
@@ -220,41 +253,212 @@ struct AppSettingsView: View {
         .formStyle(.grouped)
     }
 
-    // MARK: - Live preview card
+    // MARK: - Sync tab
 
-    private var previewCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack {
-                Color.accentColor.opacity(0.08)
-                Image(systemName: "photo")
-                    .font(.title2)
-                    .foregroundStyle(.tertiary)
-            }
-            .frame(height: 80)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Design Systems That Scale")
-                    .font(.system(size: 14 * cardTextScale, design: fontDesign))
-                    .fontWeight(.medium)
-                    .lineLimit(2)
-                Text("A look at how design systems evolve as products grow.")
-                    .font(.system(size: 12 * cardTextScale, design: fontDesign))
+    private var syncTab: some View {
+        Form {
+            Section {
+                Toggle("Auto-sync on launch and quit", isOn: $syncEnabled)
+            } footer: {
+                Text("When enabled, your data is saved when you quit and restored on launch. Point to a folder in your iCloud Drive or Dropbox to keep everything in sync across Macs.")
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                Text("Apr 21, 2026")
-                    .font(.system(size: 10 * cardTextScale, design: fontDesign))
-                    .foregroundStyle(.tertiary)
             }
-            .padding(10)
+
+            Section("Sync Folder") {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                    Text(syncFolderName)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(syncFolderName == "Not configured" ? .secondary : .primary)
+                    Spacer()
+                    Button(syncFolderName == "Not configured" ? "Choose…" : "Change…") {
+                        if SyncService.chooseSyncFolder() != nil {
+                            syncFolderName = SyncService.syncFolderDisplayName
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Last synced")
+                        if let date = displayedLastSync {
+                            Text(date, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Never")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button("Sync Now") { syncNow() }
+                        .disabled(SyncService.syncFolderURL == nil)
+                }
+
+                if let error = syncError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                if syncSuccess {
+                    Label("Synced successfully", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
+        .formStyle(.grouped)
+    }
+
+    private func syncNow() {
+        syncError   = nil
+        syncSuccess = false
+        // If no folder is set yet, ask the user to pick one first.
+        if SyncService.syncFolderURL == nil {
+            guard SyncService.chooseSyncFolder() != nil else { return }
+            syncFolderName = SyncService.syncFolderDisplayName
         }
-        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
-        .frame(width: 200)
-        .padding(.vertical, 4)
+        do {
+            try SyncService.export(context: modelContext)
+            displayedLastSync = SyncService.lastSyncDate
+            syncSuccess = true
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                syncSuccess = false
+            }
+        } catch {
+            syncError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Tag creation
+
+    private func createTag() {
+        let name = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty,
+              !allTags.contains(where: { $0.name.lowercased() == name.lowercased() })
+        else { return }
+        modelContext.insert(Tag(name: name, color: Tag.randomColor()))
+        newTagName = ""
+    }
+
+    // MARK: - Tags tab
+
+    private var tagsTab: some View {
+        VStack(spacing: 0) {
+            // Creation row — sits above the List to avoid the List's default top inset
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Color.accentColor)
+                    .font(.system(size: 15))
+                TextField("New tag…", text: $newTagName)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                    .focused($isNewTagFocused)
+                    .onSubmit { createTag() }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(.quaternary.opacity(isNewTagFocused ? 1 : 0.5))
+            )
+            .focusRing(when: isNewTagFocused, cornerRadius: 7)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            Divider()
+                .padding(.top, 8)
+            List {
+                Section {
+                    if allTags.isEmpty {
+                        Text("No tags yet — create one above.")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 4)
+                    } else {
+                        ForEach(allTags) { tag in
+                            TagSettingRow(tag: tag) {
+                                modelContext.delete(tag)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("All Tags")
+                } footer: {
+                    Text("Click a name to rename. Click the color dot to change it.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .listStyle(.plain)
+        }
+    }
+
+}
+
+// MARK: - Tag settings row
+
+private struct TagSettingRow: View {
+    @Bindable var tag: Tag
+    let onDelete: () -> Void
+
+    @State private var showDeleteConfirm = false
+    @State private var showColorPicker   = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField("", text: $tag.name)
+                .textFieldStyle(.plain)
+                .font(.body)
+
+            Spacer()
+
+            // Color dot — tap to open palette picker
+            Button {
+                showColorPicker.toggle()
+            } label: {
+                Circle()
+                    .fill(Color(hex: tag.color))
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
+                ColorSwatchPicker(colorHex: $tag.color)
+                    .padding(14)
+                    .frame(width: 280)
+            }
+
+            Text("\(tag.bookmarks.count)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+                .frame(minWidth: 16, alignment: .trailing)
+
+            Button {
+                if tag.bookmarks.isEmpty { onDelete() }
+                else { showDeleteConfirm = true }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.caption)
+                    .foregroundStyle(.red.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+        }
+        .confirmationDialog(
+            "Delete \"#\(tag.name)\"?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive, action: onDelete)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This tag is used by \(tag.bookmarks.count) bookmark\(tag.bookmarks.count == 1 ? "" : "s"). Removing the tag won't delete those bookmarks.")
+        }
     }
 }
