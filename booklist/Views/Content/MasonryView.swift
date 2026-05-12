@@ -57,11 +57,16 @@ struct MasonryView: View {
             }
             .padding(padding)
         }
-        // onGeometryChange reads geometry post-layout (not during it), avoiding the
-        // layout feedback loop that GeometryReader caused when wrapping a ScrollView
-        // with LazyVStack columns — which was hanging the main thread for 40–127 seconds.
-        .onGeometryChange(for: CGFloat.self, of: \.size.width) { newWidth in
-            availableWidth = newWidth
+        // Background GeometryReader reads the ScrollView's settled width without
+        // participating in its layout pass, breaking the feedback loop that the
+        // original GeometryReader wrapper caused (hanging the main thread 40–127s).
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: MasonryWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(MasonryWidthKey.self) { width in
+            if width > 0 { availableWidth = width }
         }
     }
 
@@ -98,4 +103,9 @@ struct MasonryView: View {
     private func delete(_ bookmark: Bookmark) {
         modelContext.delete(bookmark)
     }
+}
+
+private struct MasonryWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }

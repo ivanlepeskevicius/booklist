@@ -35,7 +35,11 @@ struct ColorSwatchPicker: View {
                 .labelsHidden()
                 .frame(width: 28, height: 28)
             }
-            .padding(8)
+            // Extra trailing padding: the native NSColorWell renders wider than its SwiftUI
+            // frame, so without extra room it bleeds past the rounded background edge.
+            .padding(.leading, 8)
+            .padding(.trailing, 20)
+            .padding(.vertical, 8)
             .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
         }
     }

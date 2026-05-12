@@ -130,9 +130,8 @@ struct CaptureView: View {
                             wishlistSection
                             noteField
                             tagsSection
-                            thumbnailSection
-                            Divider()
                             organizationSection
+                            thumbnailSection
                         }
                     }
                 }

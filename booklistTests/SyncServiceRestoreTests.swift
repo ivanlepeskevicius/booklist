@@ -388,4 +388,48 @@ struct SyncServiceRestoreTests {
     func syncFileNameConstant() {
         #expect(SyncService.syncFileName == "booklist-sync.json")
     }
+
+    // MARK: - UserDefaults properties
+
+    @Test("isEnabled defaults to false when key is absent")
+    func isEnabledDefaultsFalse() {
+        UserDefaults.standard.removeObject(forKey: "syncEnabled")
+        #expect(SyncService.isEnabled == false)
+    }
+
+    @Test("isEnabled persists a written value")
+    func isEnabledPersists() {
+        SyncService.isEnabled = true
+        #expect(SyncService.isEnabled == true)
+        SyncService.isEnabled = false
+        #expect(SyncService.isEnabled == false)
+    }
+
+    @Test("lastSyncDate defaults to nil when key is absent")
+    func lastSyncDateDefaultsNil() {
+        UserDefaults.standard.removeObject(forKey: "lastSyncDate")
+        #expect(SyncService.lastSyncDate == nil)
+    }
+
+    @Test("lastSyncDate round-trips a date value")
+    func lastSyncDateRoundTrip() throws {
+        let date = Date(timeIntervalSince1970: 1_500_000)
+        SyncService.lastSyncDate = date
+        defer { SyncService.lastSyncDate = nil }
+        let read = try #require(SyncService.lastSyncDate)
+        #expect(abs(read.timeIntervalSince(date)) < 0.001)
+    }
+
+    @Test("lastSyncDate can be cleared by setting nil")
+    func lastSyncDateClearedByNil() {
+        SyncService.lastSyncDate = Date()
+        SyncService.lastSyncDate = nil
+        #expect(SyncService.lastSyncDate == nil)
+    }
+
+    @Test("syncFolderDisplayName returns 'Not configured' when no bookmark stored")
+    func syncFolderDisplayNameNotConfigured() {
+        UserDefaults.standard.removeObject(forKey: "syncFolderBookmark")
+        #expect(SyncService.syncFolderDisplayName == "Not configured")
+    }
 }

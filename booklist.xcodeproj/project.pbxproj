@@ -8,6 +8,16 @@
 
 /* Begin PBXBuildFile section */
 		178314BA2F97650300922140 /* booklist share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 178314AE2F97650300922140 /* booklist share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA22000000000001AABB0001 /* booklistTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000001AABB0001 /* booklistTests.swift */; };
+		AA22000000000002AABB0002 /* BookmarkModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000002AABB0002 /* BookmarkModelTests.swift */; };
+		AA22000000000003AABB0003 /* ColorHexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000003AABB0003 /* ColorHexTests.swift */; };
+		AA22000000000004AABB0004 /* ExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000004AABB0004 /* ExportServiceTests.swift */; };
+		AA22000000000005AABB0005 /* ImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000005AABB0005 /* ImportServiceTests.swift */; };
+		AA22000000000006AABB0006 /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000006AABB0006 /* IntegrationTests.swift */; };
+		AA22000000000007AABB0007 /* RoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000007AABB0007 /* RoundTripTests.swift */; };
+		AA22000000000008AABB0008 /* SyncDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000008AABB0008 /* SyncDataTests.swift */; };
+		AA22000000000009AABB0009 /* SyncServiceRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000009AABB0009 /* SyncServiceRestoreTests.swift */; };
+		AA2200000000000AAABB000A /* XCTestBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1100000000000AAABB000A /* XCTestBridge.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,6 +55,18 @@
 		1783145A2F94F46300922140 /* booklist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = booklist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314AE2F97650300922140 /* booklist share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "booklist share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314D92FA153BE00922140 /* booklistTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = booklistTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		17D5B4062FB22A280061FFC1 /* booklistTests */ = {isa = PBXFileReference; lastKnownFileType = folder; path = booklistTests; sourceTree = "<group>"; };
+		17D5B4092FB28FAE0061FFC1 /* booklistTests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = booklistTests.xctestplan; sourceTree = "<group>"; };
+		AA11000000000001AABB0001 /* booklistTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = booklistTests.swift; sourceTree = "<group>"; };
+		AA11000000000002AABB0002 /* BookmarkModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkModelTests.swift; sourceTree = "<group>"; };
+		AA11000000000003AABB0003 /* ColorHexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHexTests.swift; sourceTree = "<group>"; };
+		AA11000000000004AABB0004 /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
+		AA11000000000005AABB0005 /* ImportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportServiceTests.swift; sourceTree = "<group>"; };
+		AA11000000000006AABB0006 /* IntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationTests.swift; sourceTree = "<group>"; };
+		AA11000000000007AABB0007 /* RoundTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundTripTests.swift; sourceTree = "<group>"; };
+		AA11000000000008AABB0008 /* SyncDataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncDataTests.swift; sourceTree = "<group>"; };
+		AA11000000000009AABB0009 /* SyncServiceRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncServiceRestoreTests.swift; sourceTree = "<group>"; };
+		AA1100000000000AAABB000A /* XCTestBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCTestBridge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -81,11 +103,7 @@
 			path = "booklist share";
 			sourceTree = "<group>";
 		};
-		178314DA2FA153BE00922140 /* booklistTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = booklistTests;
-			sourceTree = "<group>";
-		};
+
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,8 +136,9 @@
 			children = (
 				1783145C2F94F46300922140 /* booklist */,
 				178314AF2F97650300922140 /* booklist share */,
-				178314DA2FA153BE00922140 /* booklistTests */,
+				AA33000000000001AABB0001 /* booklistTests */,
 				1783145B2F94F46300922140 /* Products */,
+				17D5B4092FB28FAE0061FFC1 /* booklistTests.xctestplan */,
 			);
 			sourceTree = "<group>";
 		};
@@ -131,6 +150,23 @@
 				178314D92FA153BE00922140 /* booklistTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA33000000000001AABB0001 /* booklistTests */ = {
+			isa = PBXGroup;
+			children = (
+				AA11000000000001AABB0001 /* booklistTests.swift */,
+				AA11000000000002AABB0002 /* BookmarkModelTests.swift */,
+				AA11000000000003AABB0003 /* ColorHexTests.swift */,
+				AA11000000000004AABB0004 /* ExportServiceTests.swift */,
+				AA11000000000005AABB0005 /* ImportServiceTests.swift */,
+				AA11000000000006AABB0006 /* IntegrationTests.swift */,
+				AA11000000000007AABB0007 /* RoundTripTests.swift */,
+				AA11000000000008AABB0008 /* SyncDataTests.swift */,
+				AA11000000000009AABB0009 /* SyncServiceRestoreTests.swift */,
+				AA1100000000000AAABB000A /* XCTestBridge.swift */,
+			);
+			path = booklistTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -194,9 +230,6 @@
 			);
 			dependencies = (
 				178314DE2FA153BE00922140 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				178314DA2FA153BE00922140 /* booklistTests */,
 			);
 			name = booklistTests;
 			packageProductDependencies = (
@@ -291,6 +324,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA22000000000001AABB0001 /* booklistTests.swift in Sources */,
+				AA22000000000002AABB0002 /* BookmarkModelTests.swift in Sources */,
+				AA22000000000003AABB0003 /* ColorHexTests.swift in Sources */,
+				AA22000000000004AABB0004 /* ExportServiceTests.swift in Sources */,
+				AA22000000000005AABB0005 /* ImportServiceTests.swift in Sources */,
+				AA22000000000006AABB0006 /* IntegrationTests.swift in Sources */,
+				AA22000000000007AABB0007 /* RoundTripTests.swift in Sources */,
+				AA22000000000008AABB0008 /* SyncDataTests.swift in Sources */,
+				AA22000000000009AABB0009 /* SyncServiceRestoreTests.swift in Sources */,
+				AA2200000000000AAABB000A /* XCTestBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

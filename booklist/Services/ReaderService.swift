@@ -145,9 +145,16 @@ actor ReaderService {
     }
 
     private func firstTagContent(_ tag: String, in html: String) -> String? {
-        let pattern = "(?is)<\(tag)(\\s[^>]*)?>.*?</\(tag)>"
+        // Greedy .* finds the outermost matching close tag, handling nested same-name elements (e.g. NYT nested <article>)
+        let pattern = "(?is)<\(tag)(\\s[^>]*)?>.*</\(tag)>"
         guard let range = html.range(of: pattern, options: .regularExpression) else { return nil }
         return String(html[range])
+    }
+
+    /// Approximate plain-text length of an HTML string (strips all tags).
+    func plainTextLength(_ html: String) -> Int {
+        let stripped = html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        return stripped.trimmingCharacters(in: .whitespacesAndNewlines).count
     }
 
     /// Removes tag blocks whose content would distract from the article text.

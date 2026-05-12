@@ -286,17 +286,18 @@ struct BookmarkCardView: View {
             }
             actionButton("arrow.up.right.square", "Open",   action: onOpen)
             actionButton("slider.horizontal.3",   "Edit",   action: onManage)
-            actionButton("trash",                 "Delete") { showDeleteConfirm = true }
+            actionButton("trash",                 "Delete", color: .red) { showDeleteConfirm = true }
         }
         .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         .padding(8)
     }
 
-    private func actionButton(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ icon: String, _ label: String, color: Color = .primary, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(color)
                 .frame(width: 32, height: 32)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
         }

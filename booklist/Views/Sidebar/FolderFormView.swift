@@ -21,6 +21,8 @@ struct FolderFormView: View {
     @State private var icon     = "folder"
     @State private var colorHex = "#8B8B8B"
 
+    @FocusState private var isNameFocused: Bool
+
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
@@ -56,44 +58,31 @@ struct FolderFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // Live preview of the folder icon
-                Section {
-                    HStack {
-                        Spacer()
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color(hex: colorHex).opacity(0.15))
-                                .frame(width: 64, height: 64)
-                            if icon.isEmpty || isSFSymbolName(icon) {
-                                Image(systemName: icon.isEmpty ? "folder" : icon)
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(Color(hex: colorHex))
-                            } else {
-                                Text(icon)
-                                    .font(.system(size: 28))
-                            }
-                        }
-                        Spacer()
+            // Custom layout instead of Form so TextFields are reliably left-aligned.
+            // macOS .formStyle(.grouped) forces trailing text alignment on TextFields
+            // and overrides multilineTextAlignment — a plain ScrollView avoids this.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    iconPreview
+
+                    formGroup(title: "Name") {
+                        TextField("", text: $name)
+                            .focused($isNameFocused)
+                            .textFieldStyle(.plain)
+                            .padding(10)
                     }
-                    .padding(.vertical, 4)
-                }
-                .listRowBackground(Color.clear)
 
-                Section("Name") {
-                    TextField("e.g. Design", text: $name)
-                }
+                    formGroup(title: "Icon") {
+                        IconPickerView(selectedIcon: $icon)
+                    }
 
-                Section("Icon") {
-                    IconPickerView(selectedIcon: $icon)
+                    formGroup(title: "Color") {
+                        ColorSwatchPicker(colorHex: $colorHex)
+                            .padding(.vertical, 4)
+                    }
                 }
-
-                Section("Color") {
-                    ColorSwatchPicker(colorHex: $colorHex)
-                        .padding(.vertical, 4)
-                }
+                .padding(20)
             }
-            .formStyle(.grouped)
             .navigationTitle(navigationTitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -106,8 +95,48 @@ struct FolderFormView: View {
             }
         }
         .frame(minWidth: 340, minHeight: 380)
-        .onAppear { loadInitialValues() }
+        .onAppear {
+            loadInitialValues()
+            if case .add = mode { isNameFocused = true }
+        }
     }
+
+    // MARK: - Subviews
+
+    private var iconPreview: some View {
+        HStack {
+            Spacer()
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(hex: colorHex).opacity(0.15))
+                    .frame(width: 64, height: 64)
+                if icon.isEmpty || isSFSymbolName(icon) {
+                    Image(systemName: icon.isEmpty ? "folder" : icon)
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color(hex: colorHex))
+                } else {
+                    Text(icon)
+                        .font(.system(size: 28))
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func formGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    // MARK: - Data
 
     private func loadInitialValues() {
         if case .edit(let folder) = mode {

@@ -10,7 +10,7 @@ struct FolderRowView: View {
     @Binding var selection: SidebarSelection?
 
     @Environment(\.modelContext) private var modelContext
-    @State private var isDropTargeted = false
+    @State private var isBookmarkDropTargeted = false
 
     private var children: [Folder] {
         allFolders
@@ -22,26 +22,25 @@ struct FolderRowView: View {
         rowContent
             // contentShape ensures the full row width is a drop target, not just the label text.
             .contentShape(Rectangle())
+            // Bookmark drops → assign bookmarks to this folder
             .dropDestination(for: BookmarkTransfer.self) { items, _ in
                 let idSet = Set(items.flatMap { $0.ids })
                 guard !idSet.isEmpty else { return false }
-                // One-shot fetch at drop time — avoids the N live @Query observers that
-                // would otherwise all re-render simultaneously on every bookmark change.
                 if let bookmarks = try? modelContext.fetch(FetchDescriptor<Bookmark>()) {
                     bookmarks
                         .filter { idSet.contains($0.id) }
                         .forEach { $0.collection = folder }
                 }
                 return true
-            } isTargeted: { isDropTargeted = $0 }
+            } isTargeted: { isBookmarkDropTargeted = $0 }
             .overlay {
-                if isDropTargeted {
+                if isBookmarkDropTargeted {
                     RoundedRectangle(cornerRadius: 6)
                         .strokeBorder(Color.accentColor, lineWidth: 2)
                         .allowsHitTesting(false)
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: isDropTargeted)
+            .animation(.easeOut(duration: 0.15), value: isBookmarkDropTargeted)
     }
 
     @ViewBuilder
@@ -53,6 +52,9 @@ struct FolderRowView: View {
             DisclosureGroup {
                 ForEach(children) { child in
                     FolderRowView(folder: child, allFolders: allFolders, selection: $selection)
+                }
+                .onMove { indices, destination in
+                    reorderFolders(indices: indices, destination: destination, among: children)
                 }
             } label: {
                 folderLabel
@@ -73,5 +75,15 @@ struct FolderRowView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Child reordering
+
+    private func reorderFolders(indices: IndexSet, destination: Int, among sorted: [Folder]) {
+        var mutable = sorted
+        mutable.move(fromOffsets: indices, toOffset: destination)
+        for (i, f) in mutable.enumerated() {
+            f.sortOrder = i
+        }
     }
 }

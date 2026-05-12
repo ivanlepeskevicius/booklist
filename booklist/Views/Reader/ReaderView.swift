@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 /// Distraction-free reader, embedded as an inline right-hand panel inside ContentAreaView.
 struct ReaderView: View {
@@ -9,12 +10,17 @@ struct ReaderView: View {
     @State private var showFontControls = false
     @State private var systemFonts: [String] = []
 
-    @AppStorage("readerFontName") private var readerFontName = ""
-    @AppStorage("readerFontSize") private var readerFontSize = 15
+    @AppStorage("readerFontName")   private var readerFontName   = ""
+    @AppStorage("readerFontSize")   private var readerFontSize   = 15
+    @AppStorage("readerDefaultWeb") private var readerDefaultWeb = true
+
+    @State private var showWebView          = true
+    @State private var readerContentLoaded = false
 
     private enum LoadState {
         case loading
         case loaded(AttributedString)
+        case webFallback(URL)
         case failed(String)
     }
 
@@ -25,7 +31,13 @@ struct ReaderView: View {
             contentArea
         }
         .task(id: bookmark.id) {
-            await loadContent()
+            showWebView = readerDefaultWeb
+            readerContentLoaded = false
+            loadState = .loading
+            if !showWebView {
+                await loadContent()
+                readerContentLoaded = true
+            }
         }
         .onChange(of: readerFontName) { _, _ in
             Task { await rebuildContent() }
@@ -50,14 +62,25 @@ struct ReaderView: View {
                 fontName: readerFontName,
                 baseFontSize: readerFontSize
             )
-            loadState = .loaded(content)
+            // Fall back to the in-app web view when extracted text is too thin
+            // (e.g. JS-rendered pages like Reddit that return a near-empty shell)
+            if content.characters.count < 300, let url = URL(string: bookmark.url) {
+                loadState = .webFallback(url)
+            } else {
+                loadState = .loaded(content)
+            }
         } catch {
-            loadState = .failed(error.localizedDescription)
+            if let url = URL(string: bookmark.url) {
+                loadState = .webFallback(url)
+            } else {
+                loadState = .failed(error.localizedDescription)
+            }
         }
     }
 
     /// Rebuilds from cached HTML — no network fetch, no loading flash.
     private func rebuildContent() async {
+        guard case .loaded = loadState else { return }
         do {
             if let content = try await ReaderService.shared.rebuildFromCache(
                 url: bookmark.url,
@@ -68,6 +91,18 @@ struct ReaderView: View {
             }
         } catch {
             // Keep existing content if rebuild fails
+        }
+    }
+
+    private func toggleMode() {
+        if showWebView {
+            showWebView = false
+            if !readerContentLoaded {
+                readerContentLoaded = true
+                Task { await loadContent() }
+            }
+        } else {
+            showWebView = true
         }
     }
 
@@ -103,20 +138,32 @@ struct ReaderView: View {
 
             Spacer()
 
-            // Font / size controls
-            Button {
-                showFontControls.toggle()
-            } label: {
-                Image(systemName: "textformat.size")
+            // Font / size controls — only relevant in reader mode
+            if !showWebView {
+                Button {
+                    showFontControls.toggle()
+                } label: {
+                    Image(systemName: "textformat.size")
+                        .font(.title3)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Reader settings")
+                .popover(isPresented: $showFontControls, arrowEdge: .bottom) {
+                    fontControlsPopover
+                }
+            }
+
+            // Web preview / reader mode toggle
+            Button { toggleMode() } label: {
+                Image(systemName: showWebView ? "doc.plaintext" : "globe")
                     .font(.title3)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Reader settings")
-            .popover(isPresented: $showFontControls, arrowEdge: .bottom) {
-                fontControlsPopover
-            }
+            .help(showWebView ? "Switch to Reader" : "Switch to Web preview")
 
             Button {
                 if let url = URL(string: bookmark.url) {
@@ -177,6 +224,18 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var contentArea: some View {
+        if showWebView {
+            if let url = URL(string: bookmark.url) {
+                ReaderWebView(url: url)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else {
+            readerContent
+        }
+    }
+
+    @ViewBuilder
+    private var readerContent: some View {
         switch loadState {
         case .loading:
             VStack(spacing: 12) {
@@ -196,6 +255,10 @@ struct ReaderView: View {
                     .padding(.vertical, 28)
             }
             .frame(maxWidth: .infinity)
+
+        case .webFallback(let url):
+            ReaderWebView(url: url)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .failed(let message):
             VStack(spacing: 16) {
@@ -221,4 +284,33 @@ struct ReaderView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
+}
+
+// MARK: - Web fallback view
+
+/// Renders the full page inside a WKWebView with nav/header/footer suppressed via injected CSS.
+private struct ReaderWebView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> WKWebView {
+        let css = """
+            nav,header,footer,aside,
+            [role=navigation],[role=banner],[role=complementary],
+            .ad,.ads,.advertisement { display: none !important; }
+            body { max-width: 800px; margin: 0 auto; padding: 24px; }
+        """
+        let js = """
+            var s = document.createElement('style');
+            s.textContent = `\(css)`;
+            document.head.appendChild(s);
+        """
+        let script = WKUserScript(source: js, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        let config = WKWebViewConfiguration()
+        config.userContentController.addUserScript(script)
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.load(URLRequest(url: url))
+        return webView
+    }
+
+    func updateNSView(_ webView: WKWebView, context: Context) {}
 }

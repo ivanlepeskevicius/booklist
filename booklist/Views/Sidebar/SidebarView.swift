@@ -77,6 +77,9 @@ struct SidebarView: View {
                 ForEach(rootFolders) { folder in
                     FolderRowView(folder: folder, allFolders: allFolders, selection: $selection)
                 }
+                .onMove { indices, destination in
+                    reorderFolders(indices: indices, destination: destination, among: rootFolders)
+                }
             } header: {
                 Text("Library")
             }
@@ -94,6 +97,31 @@ struct SidebarView: View {
                     isAddingSubfolder = true
                 } label: {
                     Label("Add Subfolder", systemImage: "folder.badge.plus")
+                }
+
+                if folder.parent != nil {
+                    Button {
+                        let maxOrder = rootFolders.map { $0.sortOrder }.max() ?? -1
+                        folder.parent = nil
+                        folder.sortOrder = maxOrder + 1
+                    } label: {
+                        Label("Promote to Library", systemImage: "arrow.up.to.line")
+                    }
+                }
+
+                let moveTargets = validMoveTargets(for: folder)
+                if !moveTargets.isEmpty {
+                    Menu {
+                        ForEach(moveTargets.sorted { $0.name < $1.name }) { target in
+                            Button(target.name) {
+                                let childCount = allFolders.filter { $0.parent?.id == target.id }.count
+                                folder.parent = target
+                                folder.sortOrder = childCount
+                            }
+                        }
+                    } label: {
+                        Label("Move into...", systemImage: "folder")
+                    }
                 }
 
                 Divider()
@@ -144,6 +172,26 @@ struct SidebarView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This folder and all its subfolders will be removed. Bookmarks will move to Inbox.")
+        }
+    }
+
+    // MARK: - Folder reordering
+
+    private func reorderFolders(indices: IndexSet, destination: Int, among sorted: [Folder]) {
+        var mutable = sorted
+        mutable.move(fromOffsets: indices, toOffset: destination)
+        for (i, f) in mutable.enumerated() {
+            f.sortOrder = i
+        }
+    }
+
+    // Returns folders that are valid reparenting targets for the given folder:
+    // excludes self, current parent, and all descendants (which would create a cycle).
+    private func validMoveTargets(for folder: Folder) -> [Folder] {
+        allFolders.filter { target in
+            target.id != folder.id &&
+            target.id != folder.parent?.id &&
+            !subtreeContains(id: target.id, parentID: folder.id)
         }
     }
 

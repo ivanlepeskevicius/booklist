@@ -15,6 +15,8 @@ struct AppSettingsView: View {
     @AppStorage("showInDock")         private var showInDock         = false
     @AppStorage("preferredCurrency")  private var preferredCurrency  = Locale.current.currency?.identifier ?? "USD"
     @AppStorage("staleDaysThreshold") private var staleDaysThreshold = 90
+    @AppStorage("readerDefaultWeb")    private var readerDefaultWeb    = true
+    @AppStorage("captureShortcutKey")  private var captureShortcutKey  = "t"
     @AppStorage("listShowSource")     private var listShowSource     = true
     @AppStorage("listShowSaved")      private var listShowSaved      = true
     @AppStorage("listShowLastOpened") private var listShowLastOpened = true
@@ -91,6 +93,25 @@ struct AppSettingsView: View {
                     Text("System").tag("system")
                     Text("Light").tag("light")
                     Text("Dark").tag("dark")
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Shortcuts") {
+                Picker("New capture", selection: $captureShortcutKey) {
+                    Text("⌘T").tag("t")
+                    Text("⌘N").tag("n")
+                    Text("⌘B").tag("b")
+                    Text("⌘K").tag("k")
+                    Text("None").tag("none")
+                }
+                .pickerStyle(.menu)
+            }
+
+            Section("Reader") {
+                Picker("Default view", selection: $readerDefaultWeb) {
+                    Text("Web preview").tag(true)
+                    Text("Reader").tag(false)
                 }
                 .pickerStyle(.segmented)
             }

@@ -377,8 +377,9 @@ struct MetadataFetcher {
     }
 
     private static func imgSrcs(in html: String) -> [String] {
-        let skipWords = ["pixel", "spacer", "blank", "transparent", "tracking", "beacon"]
-        let minPx = 100
+        let skipWords = ["pixel", "spacer", "blank", "transparent", "tracking", "beacon",
+                         "-thumbnail", "_thumb", "/thumb/", "_small", "_tiny"]
+        let minPx = 200
 
         // Capture the full attribute string of each <img> tag so we can inspect
         // width/height alongside src — plain src-only regex can't do this.
@@ -408,7 +409,7 @@ struct MetadataFetcher {
             guard let r1 = Range(match.range(at: 1), in: url),
                   let r2 = Range(match.range(at: 2), in: url),
                   let w = Int(url[r1]), let h = Int(url[r2]) else { continue }
-            if w < 150 && h < 150 { return true }
+            if w < 250 && h < 250 { return true }
         }
         return false
     }

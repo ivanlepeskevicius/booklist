@@ -8,24 +8,32 @@ struct ImagePickerGrid: View {
     @Binding var selectedURL: String?
     var scrollable: Bool = true
 
-    @State private var showAll = false
+    @State private var showAll    = false
+    @State private var failedURLs: Set<String> = []
 
     private let pageSize = 6
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
+    private var validURLs: [String] { imageURLs.filter { !failedURLs.contains($0) } }
+
     var body: some View {
-        let visibleURLs = showAll ? imageURLs : Array(imageURLs.prefix(pageSize))
-        let remaining   = imageURLs.count - pageSize
+        let visibleURLs = showAll ? validURLs : Array(validURLs.prefix(pageSize))
+        let remaining   = validURLs.count - pageSize
 
         let content = VStack(alignment: .leading, spacing: 8) {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(visibleURLs, id: \.self) { urlString in
                     ImagePickerCell(
                         urlString: urlString,
-                        isSelected: selectedURL == urlString
-                    ) {
-                        selectedURL = urlString
-                    }
+                        isSelected: selectedURL == urlString,
+                        onSelect: { selectedURL = urlString },
+                        onFail: {
+                            failedURLs.insert(urlString)
+                            if selectedURL == urlString {
+                                selectedURL = validURLs.first { !failedURLs.contains($0) }
+                            }
+                        }
+                    )
                 }
             }
             .padding(2) // room for selection border
@@ -39,7 +47,7 @@ struct ImagePickerGrid: View {
         }
 
         if scrollable {
-            ScrollView { content }.frame(maxHeight: 220)
+            ScrollView { content }.frame(maxHeight: 320)
         } else {
             content
         }
@@ -52,31 +60,38 @@ private struct ImagePickerCell: View {
     let urlString: String
     let isSelected: Bool
     let onSelect: () -> Void
+    let onFail: () -> Void
+
+    @State private var hasFailed = false
 
     var body: some View {
         Button(action: onSelect) {
             ZStack(alignment: .topTrailing) {
                 // Thumbnail — Color.clear owns the layout frame; AsyncImage goes in an
-                // overlay so its natural (fill-mode) size never affects row height.
+                // overlay so its natural size never affects row height. .fit mode ensures
+                // the full image is always visible; .quaternary fill covers the letterbox gaps.
                 Color.clear
-                    .frame(maxWidth: .infinity, minHeight: 80, maxHeight: 80)
+                    .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 120)
+                    .background(.quaternary)
                     .overlay {
                         AsyncImage(url: URL(string: urlString)) { phase in
                             switch phase {
                             case .success(let image):
                                 image
                                     .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            default:
-                                ZStack {
-                                    Rectangle().fill(.quaternary)
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.tertiary)
+                                    .aspectRatio(contentMode: .fit)
+                            case .failure:
+                                Color.clear.onAppear {
+                                    guard !hasFailed else { return }
+                                    hasFailed = true
+                                    onFail()
                                 }
+                            default:
+                                Image(systemName: "photo")
+                                    .foregroundStyle(.tertiary)
                             }
                         }
                     }
-                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)

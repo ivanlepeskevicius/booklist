@@ -25,8 +25,10 @@ struct ContentAreaView: View {
 
     @FocusState private var isSearchFocused: Bool
 
-    @AppStorage("showTitleOnCards") private var showTitleOnCards = true
-    @AppStorage("showDateOnCards")  private var showDateOnCards  = true
+    @AppStorage("showTitleOnCards")    private var showTitleOnCards = true
+    @AppStorage("showDateOnCards")     private var showDateOnCards  = true
+    @AppStorage("readerPanelWidth")    private var readerWidth: Double = 460
+    @AppStorage("captureShortcutKey")  private var captureShortcutKey = "t"
 
     // MARK: - Derived data
 
@@ -52,7 +54,11 @@ struct ContentAreaView: View {
         case .all:
             result = allBookmarks
         case .folder(let id):
-            result = allBookmarks.filter { $0.collection?.id == id }
+            let ids = subtreeFolderIDs(rootID: id)
+            result = allBookmarks.filter { bm in
+                guard let cid = bm.collection?.id else { return false }
+                return ids.contains(cid)
+            }
         }
 
         // 2. Filter by selected tags (OR logic — show bookmarks that have any selected tag)
@@ -116,13 +122,15 @@ struct ContentAreaView: View {
                 content
             }
 
-            // Inline reader panel — slides in from the right
+            // Inline reader panel — slides in from the right, width is user-adjustable
             if let bookmark = readerBookmark {
-                Divider()
-                ReaderView(bookmark: bookmark, onClose: { readerBookmark = nil })
-                    .frame(width: 460)
-                    .id(bookmark.id)
-                    .transition(.move(edge: .trailing))
+                HStack(spacing: 0) {
+                    ReaderDragHandle(width: $readerWidth)
+                    ReaderView(bookmark: bookmark, onClose: { readerBookmark = nil })
+                        .frame(width: CGFloat(readerWidth))
+                        .id(bookmark.id)
+                }
+                .transition(.move(edge: .trailing))
             }
         }
         .animation(.easeInOut(duration: 0.22), value: readerBookmark != nil)
@@ -162,8 +170,10 @@ struct ContentAreaView: View {
                 Button { showingCapture = true } label: {
                     Image(systemName: "plus")
                 }
-                .keyboardShortcut("n", modifiers: .command)
-                .help("Save a new link (⌘N)")
+                .captureShortcut(captureShortcutKey)
+                .help(captureShortcutKey == "none"
+                      ? "Save a new link"
+                      : "Save a new link (⌘\(captureShortcutKey.uppercased()))")
 
                 SettingsLink {
                     Image(systemName: "gear")
@@ -186,10 +196,19 @@ struct ContentAreaView: View {
         .sheet(isPresented: $showingImport) {
             ImportView()
         }
-        // Clear selection when navigating to a different sidebar item.
+        // Clear selection and close reader when navigating to a different sidebar item.
         .onChange(of: selection) {
             selectedBookmarkIDs = []
             selectedTagIDs = []
+            readerBookmark = nil
+        }
+        // When reader is open and the user single-selects a different card, switch to it.
+        .onChange(of: selectedBookmarkIDs) { _, newIDs in
+            guard readerBookmark != nil,
+                  newIDs.count == 1,
+                  let id = newIDs.first,
+                  let bm = displayedBookmarks.first(where: { $0.id == id }) else { return }
+            readerBookmark = bm
         }
         // Auto-open capture when a URL arrives from the Share Extension / deep link.
         .onChange(of: captureRouter.pendingURL) { _, newURL in
@@ -320,6 +339,16 @@ struct ContentAreaView: View {
         }
     }
 
+    // MARK: - Folder subtree
+
+    private func subtreeFolderIDs(rootID: UUID) -> Set<UUID> {
+        var result: Set<UUID> = [rootID]
+        for child in allFolders where child.parent?.id == rootID {
+            result.formUnion(subtreeFolderIDs(rootID: child.id))
+        }
+        return result
+    }
+
     private var emptyState: some View {
         let isWishlist = selection == .wishlist
         return ContentUnavailableView(
@@ -333,5 +362,47 @@ struct ContentAreaView: View {
                 : "Try a different search term."
             )
         )
+    }
+}
+
+// MARK: - Capture shortcut helper
+
+private extension View {
+    @ViewBuilder
+    func captureShortcut(_ key: String) -> some View {
+        if key != "none", let char = key.first {
+            self.keyboardShortcut(KeyEquivalent(char), modifiers: .command)
+        } else {
+            self
+        }
+    }
+}
+
+// MARK: - Reader drag handle
+
+/// A thin draggable divider that lets the user resize the reader panel.
+/// Width is clamped between 300 and 800 pt; drag left to widen, right to narrow.
+private struct ReaderDragHandle: View {
+    @Binding var width: Double
+    @State private var dragStartWidth: Double?
+
+    var body: some View {
+        Color(nsColor: .separatorColor)
+            .frame(width: 1)
+            .frame(width: 8)        // wider invisible hit area around the 1pt line
+            .contentShape(Rectangle()) // required on macOS — Color.clear doesn't receive gestures
+            .onHover { inside in
+                if inside { NSCursor.resizeLeftRight.push() }
+                else      { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragStartWidth == nil { dragStartWidth = width }
+                        // Dragging left (negative delta) widens the reader; right narrows it.
+                        width = max(300, min(800, (dragStartWidth ?? width) - value.translation.width))
+                    }
+                    .onEnded { _ in dragStartWidth = nil }
+            )
     }
 }

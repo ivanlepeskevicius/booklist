@@ -190,4 +190,27 @@ struct BookmarkModelTests {
             #expect(parent.childrenIfAny == nil)
         }
     }
+
+    // MARK: - Tag.randomColor
+
+    @Suite("Tag.randomColor")
+    struct TagRandomColorTests {
+
+        @Test("palette has 28 entries")
+        func paletteCount() {
+            #expect(Tag.palette.count == 28)
+        }
+
+        @Test("randomColor returns a value from the palette")
+        func returnsValueInPalette() {
+            #expect(Tag.palette.contains(Tag.randomColor()))
+        }
+
+        @Test("randomColor always returns palette values over 100 calls")
+        func alwaysInPaletteOverManyCalls() {
+            for _ in 0..<100 {
+                #expect(Tag.palette.contains(Tag.randomColor()))
+            }
+        }
+    }
 }
