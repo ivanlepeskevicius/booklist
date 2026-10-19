@@ -68,12 +68,9 @@ struct CaptureView: View {
         return symbols[preferredCurrency] ?? preferredCurrency
     }
 
-    /// Ensures the saved price has a currency prefix. If the user typed a bare
-    /// number (e.g. "29.99"), the selected currency symbol is prepended.
+    /// Stores the price in the preferred currency, whatever currency text was typed or scraped.
     private func formattedPrice(_ raw: String) -> String {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let first = trimmed.first else { return trimmed }
-        return first.isNumber ? currencySymbol + trimmed : trimmed
+        PriceFormatter.normalized(raw, symbol: currencySymbol)
     }
 
     /// Strips scheme, trailing slash, and lowercases so "https://Example.com/" == "http://example.com".
@@ -394,7 +391,7 @@ struct CaptureView: View {
             // When a price was auto-detected but the toggle is off, show a hint
             // so the user knows the value is waiting for them.
             if !isWishlistItem && !price.isEmpty {
-                Label("Price found: \(price) — turn on to save it", systemImage: "tag")
+                Label("Price found: \(formattedPrice(price)) — turn on to save it", systemImage: "tag")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .transition(.opacity)
@@ -481,9 +478,10 @@ struct CaptureView: View {
             faviconURL       = meta.faviconURL
             candidateImages  = meta.imageURLs
             selectedImageURL = meta.imageURLs.first
-            // Pre-fill price if the page has structured pricing data
+            // Pre-fill price if the page has structured pricing data. Only the amount is kept —
+            // the field already shows the preferred currency symbol in front of it.
             if let extractedPrice = meta.price, !extractedPrice.isEmpty {
-                price = extractedPrice
+                price = PriceFormatter.amount(in: extractedPrice) ?? extractedPrice
             }
             // Synthesize a post card image for Reddit (text posts have no remote thumbnail)
             if let subreddit = meta.redditSubreddit {

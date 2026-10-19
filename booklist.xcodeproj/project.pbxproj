@@ -13,6 +13,7 @@
 		17DB62783086200B0090B616 /* BookmarkBulkActionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DB62773086200B0090B616 /* BookmarkBulkActionsTests.swift */; };
 		17DB627C308625900090B616 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 17DB627B308625900090B616 /* KeyboardShortcuts */; };
 		17DB627E308628030090B616 /* ViewModeMemoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DB627D308628030090B616 /* ViewModeMemoryTests.swift */; };
+		17DB62EA3086333A0090B616 /* PriceFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DB62E93086333A0090B616 /* PriceFormatterTests.swift */; };
 		AA22000000000001AABB0001 /* booklistTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000001AABB0001 /* booklistTests.swift */; };
 		AA22000000000002AABB0002 /* BookmarkModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000002AABB0002 /* BookmarkModelTests.swift */; };
 		AA22000000000003AABB0003 /* ColorHexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11000000000003AABB0003 /* ColorHexTests.swift */; };
@@ -65,6 +66,7 @@
 		17D5B4092FB28FAE0061FFC1 /* booklistTests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = booklistTests.xctestplan; sourceTree = "<group>"; };
 		17DB62773086200B0090B616 /* BookmarkBulkActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkBulkActionsTests.swift; sourceTree = "<group>"; };
 		17DB627D308628030090B616 /* ViewModeMemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModeMemoryTests.swift; sourceTree = "<group>"; };
+		17DB62E93086333A0090B616 /* PriceFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceFormatterTests.swift; sourceTree = "<group>"; };
 		AA11000000000001AABB0001 /* booklistTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = booklistTests.swift; sourceTree = "<group>"; };
 		AA11000000000002AABB0002 /* BookmarkModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkModelTests.swift; sourceTree = "<group>"; };
 		AA11000000000003AABB0003 /* ColorHexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHexTests.swift; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 				178E71482FB7DBD4002D66E9 /* MasonryTests.swift */,
 				17DB62773086200B0090B616 /* BookmarkBulkActionsTests.swift */,
 				17DB627D308628030090B616 /* ViewModeMemoryTests.swift */,
+				17DB62E93086333A0090B616 /* PriceFormatterTests.swift */,
 			);
 			path = booklistTests;
 			sourceTree = "<group>";
@@ -355,6 +358,7 @@
 				AA22000000000003AABB0003 /* ColorHexTests.swift in Sources */,
 				AA22000000000004AABB0004 /* ExportServiceTests.swift in Sources */,
 				AA22000000000005AABB0005 /* ImportServiceTests.swift in Sources */,
+				17DB62EA3086333A0090B616 /* PriceFormatterTests.swift in Sources */,
 				178E71452FB70B0C002D66E9 /* FolderTreeTests.swift in Sources */,
 				AA22000000000006AABB0006 /* IntegrationTests.swift in Sources */,
 				AA22000000000007AABB0007 /* RoundTripTests.swift in Sources */,

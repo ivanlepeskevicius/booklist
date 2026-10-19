@@ -44,9 +44,8 @@ struct ManagePanelView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        if let raw = bookmark.price, !raw.isEmpty,
-                           let first = raw.first, first.isNumber {
-                            bookmark.price = currencySymbol + raw
+                        if let raw = bookmark.price, !raw.isEmpty {
+                            bookmark.price = PriceFormatter.normalized(raw, symbol: currencySymbol)
                         }
                         dismiss()
                     }

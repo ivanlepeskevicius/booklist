@@ -165,4 +165,5 @@ Core app is functional. All foundation phases are complete.
 | 2026-10-19 | Plain value types used by tests (`SidebarSelection`, `ViewMode`, `CardSize`, `ViewModeMemory`) are `nonisolated` | Target defaults to MainActor; otherwise their Equatable conformances are main-actor-only (Swift 6 error in tests) |
 | 2026-10-19 | Capture "Save" bound to ⌘Return (was Return) | Plain Return must insert a newline in the multi-line note field |
 | 2026-10-19 | Reader panel guarded by `Bookmark.isAlive` + closes when its bookmark disappears from the query | Deleting the open bookmark via hover/context menu left the reader on a deleted model (crash risk) |
+| 2026-10-19 | Prices normalised via `PriceFormatter` to preferred symbol + amount ("€18"); page currency text is dropped | User feedback: "18 EUR" / "18 €" from shop pages ignored the € default. No conversion — a foreign-currency page gets the preferred symbol |
 | 2026-10-19 | Settings consolidated to 4 tabs: General (incl. currency), Display (cards + list columns), Tags, Sync | Fewer tabs = less hunting |
