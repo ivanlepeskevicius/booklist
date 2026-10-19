@@ -25,6 +25,7 @@ struct SidebarView: View {
 
     // Drop target state for the Inbox row
     @State private var isInboxDropTargeted = false
+    @State private var isLibraryDropTargeted = false
 
     private var inboxCount: Int {
         allBookmarks.filter { $0.collection == nil && $0.itemType == .bookmark }.count
@@ -81,7 +82,22 @@ struct SidebarView: View {
                     reorderFolders(indices: indices, destination: destination, among: rootFolders)
                 }
             } header: {
+                // Dropping a folder on the "Library" header makes it top-level.
                 Text("Library")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .dropDestination(for: FolderTransfer.self) { items, _ in
+                        guard let id = items.first?.id,
+                              let dragged = allFolders.first(where: { $0.id == id }) else { return false }
+                        return FolderTree.move(dragged, into: nil, folders: allFolders)
+                    } isTargeted: { isLibraryDropTargeted = $0 }
+                    .overlay {
+                        if isLibraryDropTargeted {
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(Color.accentColor, lineWidth: 2)
+                                .allowsHitTesting(false)
+                        }
+                    }
             }
         }
         .listStyle(.sidebar)
@@ -101,26 +117,24 @@ struct SidebarView: View {
 
                 if folder.parent != nil {
                     Button {
-                        let maxOrder = rootFolders.map { $0.sortOrder }.max() ?? -1
-                        folder.parent = nil
-                        folder.sortOrder = maxOrder + 1
+                        FolderTree.move(folder, into: nil, folders: allFolders)
                     } label: {
                         Label("Promote to Library", systemImage: "arrow.up.to.line")
                     }
                 }
 
-                let moveTargets = validMoveTargets(for: folder)
+                // Full paths in sidebar order, so same-named subfolders are distinguishable.
+                let moveTargets = FolderTree.flattened(allFolders)
+                    .filter { FolderTree.canMove(folder, into: $0.folder, folders: allFolders) }
                 if !moveTargets.isEmpty {
                     Menu {
-                        ForEach(moveTargets.sorted { $0.name < $1.name }) { target in
-                            Button(target.name) {
-                                let childCount = allFolders.filter { $0.parent?.id == target.id }.count
-                                folder.parent = target
-                                folder.sortOrder = childCount
+                        ForEach(moveTargets, id: \.folder.id) { target in
+                            Button(target.path) {
+                                FolderTree.move(folder, into: target.folder, folders: allFolders)
                             }
                         }
                     } label: {
-                        Label("Move into...", systemImage: "folder")
+                        Label("Move into…", systemImage: "folder")
                     }
                 }
 
@@ -182,16 +196,6 @@ struct SidebarView: View {
         mutable.move(fromOffsets: indices, toOffset: destination)
         for (i, f) in mutable.enumerated() {
             f.sortOrder = i
-        }
-    }
-
-    // Returns folders that are valid reparenting targets for the given folder:
-    // excludes self, current parent, and all descendants (which would create a cycle).
-    private func validMoveTargets(for folder: Folder) -> [Folder] {
-        allFolders.filter { target in
-            target.id != folder.id &&
-            target.id != folder.parent?.id &&
-            !subtreeContains(id: target.id, parentID: folder.id)
         }
     }
 

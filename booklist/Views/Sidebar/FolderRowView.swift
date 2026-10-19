@@ -20,6 +20,7 @@ struct FolderRowView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var isBookmarkDropTargeted = false
+    @State private var isFolderDropTargeted = false
 
     private var children: [Folder] {
         allFolders
@@ -84,6 +85,21 @@ struct FolderRowView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        // Drag a folder onto another to nest it. Drops into itself or its own subfolders are refused.
+        .draggable(FolderTransfer(id: folder.id))
+        .dropDestination(for: FolderTransfer.self) { items, _ in
+            guard let id = items.first?.id,
+                  let dragged = allFolders.first(where: { $0.id == id }) else { return false }
+            return FolderTree.move(dragged, into: folder, folders: allFolders)
+        } isTargeted: { isFolderDropTargeted = $0 }
+        .overlay {
+            if isFolderDropTargeted {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: - Child reordering

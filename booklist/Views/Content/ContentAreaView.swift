@@ -141,6 +141,15 @@ struct ContentAreaView: View {
                     Divider()
                 }
                 content(for: bookmarks)
+                    // safeAreaInset (not overlay) so the last cards can scroll above the bar.
+                    .safeAreaInset(edge: .bottom) {
+                        let selected = bookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+                        if selected.count >= 2 {
+                            selectionBar(selected: selected, all: bookmarks)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.easeOut(duration: 0.2), value: selectedBookmarkIDs.count >= 2)
             }
 
             // Inline reader panel — slides in from the right, width is user-adjustable.
@@ -269,6 +278,47 @@ struct ContentAreaView: View {
             captureRouter.isCaptureRequested = false
             showingCapture = true
         }
+    }
+
+    // MARK: - Selection bar
+
+    /// Floating actions for a multi-selection: makes bulk move/tag/delete visible instead of
+    /// hidden behind right-click.
+    private func selectionBar(selected: [Bookmark], all: [Bookmark]) -> some View {
+        HStack(spacing: 14) {
+            Text("\(selected.count) selected")
+                .font(.callout.weight(.semibold))
+                .monospacedDigit()
+
+            Divider().frame(height: 16)
+
+            BookmarkOrganizeMenu(targets: selected, folders: allFolders, tags: allTags, compact: true)
+                .fixedSize()
+
+            Button(role: .destructive) {
+                selectedBookmarkIDs = []
+                BookmarkBulkActions.delete(selected, from: modelContext)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .help("Delete selected (⌘⌫) — ⌘Z to undo")
+
+            Divider().frame(height: 16)
+
+            if selected.count < all.count {
+                Button("Select All") { selectedBookmarkIDs = Set(all.map(\.id)) }
+                    .help("Select all (⌘A)")
+            }
+            Button("Done") { selectedBookmarkIDs = [] }
+                .help("Clear selection (Esc)")
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .overlay { Capsule().strokeBorder(.separator, lineWidth: 0.5) }
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .padding(.bottom, 16)
     }
 
     // MARK: - Keyboard shortcuts

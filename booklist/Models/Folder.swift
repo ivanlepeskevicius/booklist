@@ -85,6 +85,28 @@ enum FolderTree {
             .contains { contains(targetID: targetID, in: $0.id, folders: folders, seen: nextSeen) }
     }
 
+    /// Whether `folder` can be moved into `target` (nil = top level): not into itself or one of
+    /// its own descendants (that would create a cycle), and not where it already is.
+    static func canMove(_ folder: Folder, into target: Folder?, folders: [Folder]) -> Bool {
+        if folder.parent?.id == target?.id { return false }
+        guard let target else { return true }
+        return !contains(targetID: target.id, in: folder.id, folders: folders)
+    }
+
+    /// Re-parents `folder` under `target` (nil = top level), placing it last among its new
+    /// siblings. Returns false (and changes nothing) when the move isn't allowed.
+    @discardableResult
+    static func move(_ folder: Folder, into target: Folder?, folders: [Folder]) -> Bool {
+        guard canMove(folder, into: target, folders: folders) else { return false }
+        let lastOrder = folders
+            .filter { $0.parent?.id == target?.id && $0.id != folder.id }
+            .map(\.sortOrder)
+            .max() ?? -1
+        folder.parent = target
+        folder.sortOrder = lastOrder + 1
+        return true
+    }
+
     /// All folders in depth-first tree order (siblings by sortOrder), each with a
     /// "Parent › Child" path label — for folder picker menus.
     static func flattened(_ folders: [Folder]) -> [(folder: Folder, path: String)] {

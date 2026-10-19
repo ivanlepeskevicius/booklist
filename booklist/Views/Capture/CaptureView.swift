@@ -296,10 +296,9 @@ struct CaptureView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            TextField("Why are you saving this? (optional)", text: $note, axis: .vertical)
-                .textFieldStyle(.plain)
+            NoteEditor(text: $note, placeholder: "Why are you saving this? (optional)")
                 .focused($focused, equals: .note)
-                .lineLimit(3...5)
+                .frame(minHeight: 60, maxHeight: 110)
                 .padding(10)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                 .focusRing(when: focused == .note)

@@ -103,6 +103,11 @@ struct BookmarkCardView: View {
                             .padding(8)
                     }
                 }
+                // Bottom-leading is the one free corner: cart badge is top-left, price bottom-right,
+                // status dot top-right, hover actions top-centre.
+                .overlay(alignment: .bottomLeading) {
+                    if showsSelectionCheck { selectionCheck }
+                }
             if hasCardBody {
                 cardBody
             }
@@ -152,6 +157,26 @@ struct BookmarkCardView: View {
         }
         .contextMenu { cardContextMenu }
         .draggable(dragPayload)
+    }
+
+    // MARK: - Selection checkmark
+
+    /// Shown on hover and on selected cards, so multi-select works without ⌘/⇧ — like Photos.
+    private var showsSelectionCheck: Bool { isHovered || isSelected }
+
+    private var selectionCheck: some View {
+        Button {
+            onSelect(true, false)   // same as ⌘-click: toggle this card, keep the rest
+        } label: {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.white, isSelected ? Color.accentColor : .white)
+                .background(Circle().fill(.black.opacity(isSelected ? 0 : 0.25)))
+                .shadow(color: .black.opacity(0.3), radius: 2)
+        }
+        .buttonStyle(.plain)
+        .padding(8)
+        .help(isSelected ? "Deselect" : "Select")
     }
 
     private func statusDot(_ color: Color, help: String) -> some View {
@@ -305,29 +330,65 @@ struct BookmarkCardView: View {
 
     // MARK: - Hover overlay
 
-    private var hoverOverlay: some View {
-        HStack(spacing: 6) {
-            if let onRead {
-                actionButton("eyeglasses", "Reader view", action: onRead)
-            }
-            actionButton("arrow.up.right.square", "Open",   action: onOpen)
-            actionButton("slider.horizontal.3",   "Edit",   action: onManage)
-            actionButton("trash",                 "Delete (⌘Z to undo)", color: .red) { onDelete([bookmark]) }
-        }
-        .padding(8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .padding(8)
+    private struct HoverAction {
+        let icon: String
+        let label: String
+        var color: Color = .primary
+        let action: () -> Void
     }
 
-    private func actionButton(_ icon: String, _ label: String, color: Color = .primary, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(color)
-                .frame(width: 32, height: 32)
+    private var hoverActions: [HoverAction] {
+        var actions: [HoverAction] = []
+        if let onRead {
+            actions.append(HoverAction(icon: "eyeglasses", label: "Reader view", action: onRead))
+        }
+        actions.append(HoverAction(icon: "arrow.up.right.square", label: "Open", action: onOpen))
+        actions.append(HoverAction(icon: "slider.horizontal.3", label: "Edit", action: onManage))
+        actions.append(HoverAction(icon: "trash", label: "Delete (⌘Z to undo)", color: .red) { onDelete([bookmark]) })
+        return actions
+    }
+
+    /// Centred at the top of the card. ViewThatFits picks the largest layout that fits the card's
+    /// width, so the bar never spills outside narrow cards (5 columns / small windows).
+    private var hoverOverlay: some View {
+        let actions = hoverActions
+        let firstRow = (actions.count + 1) / 2
+        return ViewThatFits(in: .horizontal) {
+            hoverBar(inset: 8) { actionRow(actions, size: 32, spacing: 6) }
+            hoverBar(inset: 5) { actionRow(actions, size: 26, spacing: 4) }
+            hoverBar(inset: 5) {
+                VStack(spacing: 4) {
+                    actionRow(Array(actions.prefix(firstRow)), size: 26, spacing: 4)
+                    actionRow(Array(actions.dropFirst(firstRow)), size: 26, spacing: 4)
+                }
+            }
+        }
+    }
+
+    private func hoverBar(inset: CGFloat, @ViewBuilder content: () -> some View) -> some View {
+        content()
+            .padding(inset)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .padding(inset)
+    }
+
+    private func actionRow(_ actions: [HoverAction], size: CGFloat, spacing: CGFloat) -> some View {
+        HStack(spacing: spacing) {
+            ForEach(actions.indices, id: \.self) { index in
+                actionButton(actions[index], size: size)
+            }
+        }
+    }
+
+    private func actionButton(_ item: HoverAction, size: CGFloat) -> some View {
+        Button(action: item.action) {
+            Image(systemName: item.icon)
+                .font(.system(size: size * 0.4, weight: .medium))
+                .foregroundStyle(item.color)
+                .frame(width: size, height: size)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
-        .help(label)
+        .help(item.label)
     }
 }

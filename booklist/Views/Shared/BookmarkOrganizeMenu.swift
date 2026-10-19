@@ -7,18 +7,26 @@ struct BookmarkOrganizeMenu: View {
     let targets: [Bookmark]
     let folders: [Folder]
     let tags: [Tag]
+    /// Short "Move to" / "Tags" labels with icons, for the selection bar (the count is shown next to it).
+    var compact = false
 
     var body: some View {
-        Menu(targets.count == 1 ? "Move to Folder" : "Move \(targets.count) Items to Folder") {
+        Menu {
             folderButton("Inbox (no folder)", folder: nil)
             if !folders.isEmpty { Divider() }
             ForEach(FolderTree.flattened(folders), id: \.folder.id) { entry in
                 folderButton(entry.path, folder: entry.folder)
             }
+        } label: {
+            if compact {
+                Label("Move to", systemImage: "folder")
+            } else {
+                Text(targets.count == 1 ? "Move to Folder" : "Move \(targets.count) Items to Folder")
+            }
         }
 
         if !tags.isEmpty {
-            Menu("Tags") {
+            Menu {
                 // Checked = every target has the tag. Choosing an unchecked tag adds it to all
                 // targets; choosing a checked one removes it from all.
                 ForEach(tags) { tag in
@@ -26,6 +34,12 @@ struct BookmarkOrganizeMenu: View {
                         get: { BookmarkBulkActions.allHave(tag, targets) },
                         set: { BookmarkBulkActions.setTag(tag, on: targets, to: $0) }
                     ))
+                }
+            } label: {
+                if compact {
+                    Label("Tags", systemImage: "tag")
+                } else {
+                    Text("Tags")
                 }
             }
         }

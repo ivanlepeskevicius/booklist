@@ -215,6 +215,90 @@ struct FolderTreeTests {
         }
     }
 
+    // MARK: - FolderTree.move
+
+    @Suite("move")
+    struct MoveTests {
+
+        private func makeContext() throws -> ModelContext {
+            let config = ModelConfiguration(isStoredInMemoryOnly: true)
+            let container = try ModelContainer(
+                for: Bookmark.self, Folder.self, Tag.self,
+                configurations: config
+            )
+            return ModelContext(container)
+        }
+
+        @Test("moving into another folder re-parents it and puts it last")
+        func moveIntoFolder() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work", sortOrder: 0)
+            let existing = Folder(name: "Existing", sortOrder: 4, parent: work)
+            let ideas = Folder(name: "Ideas", sortOrder: 1)
+            [work, existing, ideas].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(FolderTree.move(ideas, into: work, folders: folders))
+            #expect(ideas.parent?.id == work.id)
+            #expect(ideas.sortOrder == 5)
+        }
+
+        @Test("moving to nil makes it top-level")
+        func moveToTopLevel() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work")
+            let ideas = Folder(name: "Ideas", parent: work)
+            [work, ideas].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(FolderTree.move(ideas, into: nil, folders: folders))
+            #expect(ideas.parent == nil)
+        }
+
+        @Test("a folder can't move into itself")
+        func notIntoItself() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work")
+            ctx.insert(work)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(!FolderTree.move(work, into: work, folders: folders))
+            #expect(work.parent == nil)
+        }
+
+        @Test("a folder can't move into its own descendant (would create a cycle)")
+        func notIntoDescendant() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work")
+            let design = Folder(name: "Design", parent: work)
+            let ideas = Folder(name: "Ideas", parent: design)
+            [work, design, ideas].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(!FolderTree.move(work, into: ideas, folders: folders))
+            #expect(work.parent == nil)
+        }
+
+        @Test("moving to its current parent is a no-op")
+        func notToCurrentParent() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work")
+            let ideas = Folder(name: "Ideas", sortOrder: 3, parent: work)
+            [work, ideas].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(!FolderTree.canMove(ideas, into: work, folders: folders))
+            #expect(!FolderTree.canMove(work, into: nil, folders: folders))  // already top-level
+            #expect(!FolderTree.move(ideas, into: work, folders: folders))
+            #expect(ideas.sortOrder == 3)
+        }
+    }
+
     // MARK: - FolderTree.flattened
 
     @Suite("flattened")

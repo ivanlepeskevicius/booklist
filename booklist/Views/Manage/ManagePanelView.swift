@@ -80,16 +80,14 @@ struct ManagePanelView: View {
                 }
                 rowDivider
                 stackedField(label: "Note") {
-                    TextField(
-                        "Add a note…",
+                    NoteEditor(
                         text: Binding(
                             get: { bookmark.note ?? "" },
                             set: { bookmark.note = $0.isEmpty ? nil : $0 }
                         ),
-                        axis: .vertical
+                        placeholder: "Add a note…"
                     )
-                    .textFieldStyle(.plain)
-                    .lineLimit(3...8)
+                    .frame(minHeight: 60, maxHeight: 160)
                 }
             }
         }

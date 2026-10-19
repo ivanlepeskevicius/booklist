@@ -46,263 +46,12 @@ struct IconPickerView: View {
         }
     }
 
-    // MARK: - Curated SF Symbol library
-
-    static let symbolsByCategory: [(String, [String])] = [
-        ("Folders & Files", [
-            "folder", "folder.fill", "folder.badge.plus", "folder.badge.minus",
-            "folder.badge.questionmark", "folder.badge.gearshape",
-            "tray", "tray.fill", "tray.2", "tray.full", "tray.full.fill",
-            "tray.and.arrow.down", "tray.and.arrow.up", "tray.and.arrow.up.fill",
-            "archivebox", "archivebox.fill",
-            "doc", "doc.fill", "doc.richtext", "doc.plaintext",
-            "doc.text", "doc.on.doc", "doc.badge.plus", "doc.badge.arrow.up",
-            "doc.on.clipboard", "doc.on.clipboard.fill", "doc.text.magnifyingglass",
-            "paperclip", "rectangle.and.paperclip", "link",
-            "externaldrive", "externaldrive.fill", "internaldrive",
-            "briefcase", "briefcase.fill",
-            "square.and.arrow.down", "square.and.arrow.up",
-            "shippingbox", "shippingbox.fill",
-            "filemenu.and.selection",
-        ]),
-        ("Lists & Notes", [
-            "list.bullet", "list.dash", "list.number", "list.triangle",
-            "list.bullet.clipboard", "list.bullet.clipboard.fill",
-            "checklist", "checklist.checked", "checklist.unchecked",
-            "table", "table.fill",
-            "note", "note.text", "note.text.badge.plus", "square.and.pencil",
-            "pencil", "pencil.circle", "pencil.tip", "pencil.tip.crop.circle",
-            "pencil.and.outline", "highlighter", "signature",
-            "text.alignleft", "text.aligncenter",
-            "line.3.horizontal", "line.3.horizontal.decrease",
-            "bookmark", "bookmark.fill", "bookmark.circle", "bookmark.slash",
-            "pin", "pin.fill", "pin.circle",
-            "flag", "flag.fill", "flag.circle", "flag.2.crossed", "flag.slash",
-            "tag", "tag.fill", "tag.circle", "tag.slash",
-            "calendar", "calendar.badge.plus", "calendar.badge.minus", "calendar.circle",
-            "clock", "clock.fill", "timer", "alarm", "alarm.fill",
-        ]),
-        ("Media & Creative", [
-            "photo", "photo.fill", "photo.on.rectangle", "photo.stack", "photo.artframe", "photo.badge.plus",
-            "film", "film.fill",
-            "music.note", "music.note.list", "music.quarternote.3", "music.note.tv",
-            "headphones", "headphones.circle",
-            "speaker", "speaker.fill", "speaker.wave.2",
-            "waveform",
-            "radio", "radio.fill", "airplayaudio",
-            "camera", "camera.fill", "camera.circle",
-            "video", "video.fill",
-            "mic", "mic.fill", "mic.circle",
-            "paintbrush", "paintbrush.fill", "paintbrush.pointed",
-            "paintpalette", "paintpalette.fill",
-            "scissors", "lasso",
-            "wand.and.stars", "wand.and.rays", "wand.and.sparkles",
-            "eyedropper", "eyedropper.full", "crop",
-        ]),
-        ("Shopping & Money", [
-            "cart", "cart.fill", "cart.badge.plus",
-            "bag", "bag.fill", "bag.circle", "bag.badge.plus", "bag.badge.minus",
-            "handbag", "handbag.fill",
-            "backpack", "backpack.fill",
-            "gift", "gift.fill", "gift.circle",
-            "giftcard", "giftcard.fill",
-            "dollarsign", "dollarsign.circle", "dollarsign.circle.fill",
-            "creditcard", "creditcard.fill",
-            "eurosign", "sterlingsign", "yensign",
-            "banknote", "banknote.fill", "percent", "tag.slash",
-            "purchased", "purchased.circle",
-            "chart.bar", "chart.bar.xaxis", "chart.line.uptrend.xyaxis",
-            "chart.pie", "chart.pie.fill",
-        ]),
-        ("Communication", [
-            "envelope", "envelope.fill", "envelope.circle", "envelope.badge",
-            "envelope.open", "envelope.open.fill",
-            "bubble.left", "bubble.left.fill",
-            "bubble.right", "bubble.right.fill",
-            "bubble.left.and.bubble.right",
-            "bubble.middle.bottom", "bubble.middle.bottom.fill",
-            "message", "message.fill",
-            "phone", "phone.fill", "phone.circle", "phone.bubble", "phone.badge.plus",
-            "globe", "wifi", "network",
-            "antenna.radiowaves.left.and.right", "dot.radiowaves.left.and.right",
-            "at", "paperplane", "paperplane.fill",
-            "megaphone", "megaphone.fill",
-            "bell", "bell.fill", "bell.badge", "bell.and.waves.left.and.right",
-            "shareplay", "quote.bubble",
-        ]),
-        ("People & Social", [
-            "person", "person.fill", "person.circle", "person.circle.fill",
-            "person.badge.plus", "person.badge.minus",
-            "person.crop.circle", "person.crop.circle.badge.checkmark",
-            "person.2", "person.2.fill", "person.2.wave.2",
-            "person.3", "person.3.fill",
-            "figure.2",
-            "face.smiling", "face.smiling.fill",
-            "heart", "heart.fill", "heart.circle", "heart.circle.fill",
-            "hand.thumbsup", "hand.thumbsup.fill",
-            "hand.thumbsdown", "hand.thumbsdown.fill",
-            "hand.wave", "hand.raised", "hands.clap",
-            "hands.sparkles", "hands.sparkles.fill",
-            "star", "star.fill", "star.circle", "rosette",
-            "brain", "brain.head.profile",
-            "figure.walk", "figure.run", "figure.stand",
-        ]),
-        ("Technology", [
-            "laptopcomputer", "desktopcomputer", "iphone", "ipad", "applewatch",
-            "keyboard", "computermouse",
-            "cpu", "memorychip", "server.rack",
-            "externaldrive", "externaldrive.fill", "internaldrive",
-            "terminal", "curlybraces", "chevron.left.forwardslash.chevron.right",
-            "square.grid.2x2", "square.grid.3x3", "square.grid.4x3.fill",
-            "wifi", "dot.radiowaves.left.and.right", "network",
-            "gear", "gearshape", "gearshape.fill", "gearshape.2",
-            "wrench.and.screwdriver", "wrench.and.screwdriver.fill",
-            "hammer", "hammer.fill",
-            "puzzlepiece", "puzzlepiece.fill", "puzzlepiece.extension", "puzzlepiece.extension.fill",
-            "power", "power.circle", "power.circle.fill",
-            "stethoscope", "printer", "tv", "tv.fill",
-        ]),
-        ("Nature & Places", [
-            "leaf", "leaf.fill", "leaf.circle",
-            "tree", "tree.fill",
-            "flame", "flame.fill", "drop", "drop.fill",
-            "cloud", "cloud.fill", "cloud.rain", "cloud.bolt", "cloud.sun",
-            "sun.max", "sun.max.fill", "sun.horizon", "sun.horizon.fill",
-            "moon", "moon.fill", "moon.stars",
-            "snowflake", "wind",
-            "globe.europe.africa", "globe.europe.africa.fill",
-            "globe.americas", "globe.americas.fill",
-            "map", "map.fill",
-            "building.2", "building.2.fill",
-            "building.columns", "building.columns.fill",
-            "house", "house.fill",
-            "mountain.2", "mountain.2.fill",
-            "tortoise", "hare", "bird", "fish", "ant", "ladybug",
-            "dog", "dog.fill", "cat", "cat.fill", "lizard",
-            "pawprint", "pawprint.fill",
-            "beach.umbrella",
-        ]),
-        ("Activities & Sports", [
-            "book", "book.fill", "books.vertical", "books.vertical.fill",
-            "graduationcap", "graduationcap.fill",
-            "figure.run", "figure.walk", "figure.hiking",
-            "figure.yoga", "figure.basketball",
-            "figure.dance", "figure.american.football",
-            "figure.open.water.swim", "figure.pool.swim",
-            "figure.strengthtraining.traditional", "figure.mind.and.body",
-            "bicycle", "bicycle.circle", "bicycle.circle.fill",
-            "sportscourt", "sportscourt.fill",
-            "trophy", "trophy.fill", "medal", "medal.fill",
-            "dumbbell", "dumbbell.fill",
-            "soccerball", "baseball", "basketball", "tennis.racket",
-            "gamecontroller", "gamecontroller.fill",
-            "guitars", "pianokeys", "music.mic",
-            "ticket", "ticket.fill",
-            "theatermasks", "theatermasks.fill",
-        ]),
-        ("Food & Drink", [
-            "fork.knife", "fork.knife.circle",
-            "cup.and.saucer", "cup.and.saucer.fill",
-            "mug", "mug.fill",
-            "wineglass", "wineglass.fill",
-            "birthday.cake", "birthday.cake.fill",
-            "carrot",
-            "popcorn", "popcorn.fill",
-            "takeoutbag.and.cup.and.straw",
-            "cart", "bag",
-        ]),
-        ("Travel & Transport", [
-            "airplane", "airplane.departure", "airplane.arrival",
-            "car", "car.fill", "car.circle",
-            "bus", "tram",
-            "ferry", "ferry.fill",
-            "bicycle", "bicycle.circle",
-            "fuelpump", "fuelpump.fill",
-            "parkingsign", "parkingsign.circle",
-            "map", "map.fill",
-            "location", "location.fill", "location.circle",
-            "building.2.fill",
-            "signpost.right", "signpost.right.fill",
-            "figure.walk", "figure.hiking",
-        ]),
-        ("Symbols & UI", [
-            "checkmark.circle", "checkmark.circle.fill",
-            "checkmark.seal", "checkmark.seal.fill",
-            "xmark.circle", "xmark.circle.fill",
-            "plus.circle", "plus.circle.fill",
-            "minus.circle",
-            "info.circle", "info.circle.fill",
-            "questionmark.circle", "questionmark.circle.fill",
-            "exclamationmark.triangle", "exclamationmark.circle",
-            "magnifyingglass",
-            "lock", "lock.fill", "lock.open",
-            "eye", "eye.slash",
-            "lightbulb", "lightbulb.fill",
-            "sparkles", "sparkle", "wand.and.sparkles", "infinity",
-            "shield", "shield.fill",
-            "arrow.clockwise", "arrow.counterclockwise",
-            "arrow.up", "arrow.down", "arrow.left", "arrow.right", "arrow.up.right",
-            "chevron.up", "chevron.down",
-            "power", "slider.horizontal.3",
-        ]),
-    ]
-
-    // MARK: - Curated emoji library
-
-    static let emojiByCategory: [(String, [String])] = [
-        ("Folders & Files", [
-            "📁", "📂", "🗂️", "📋", "📌", "📍", "📎", "🖇️", "🔗", "🔖",
-            "📝", "✏️", "📄", "📃", "🗒️", "🗃️", "🗄️", "📦", "💾", "💿",
-            "📊", "📈", "📉", "🗑️", "📜",
-        ]),
-        ("Shopping & Money", [
-            "🛒", "🛍️", "👜", "👛", "👝", "💰", "💵", "💴", "💶", "💷", "🪙",
-            "💳", "🧾", "💎", "🎁", "🎀", "🏷️", "⌚", "💍", "💸", "🤑",
-            "📦", "🏪", "🏬",
-        ]),
-        ("Technology", [
-            "💻", "🖥️", "⌨️", "🖱️", "📱", "📲", "📡", "🔌", "🔋", "🪫",
-            "💡", "🔦", "📷", "📸", "🎥", "🖨️", "🖲️", "🕹️", "🤖",
-            "⚙️", "🔬", "🔭", "🧬", "📟", "📠",
-        ]),
-        ("Media & Art", [
-            "🎵", "🎶", "🎸", "🎹", "🥁", "🪘", "🎷", "🎺", "🎻", "🪗",
-            "🎬", "🎭", "🎨", "🖼️", "🖌️", "🎤", "🎙️",
-            "📻", "📺", "🎞️", "📽️", "🎮",
-        ]),
-        ("Nature", [
-            "🌿", "🌱", "🌳", "🌲", "🌴", "🌵", "🍀", "🌸", "🌺", "🌻",
-            "🌹", "🌷", "🍃", "🍂", "🍁", "🍄", "🌾", "🪸",
-            "🌙", "⭐", "🌟", "☀️", "🌈", "🔥", "💧", "🌊", "❄️", "⛅",
-            "🦁", "🐘", "🦊", "🐺", "🦋", "🐝", "🐠", "🦜",
-        ]),
-        ("Food & Drink", [
-            "☕", "🍵", "🧃", "🥤", "🧋", "🍺", "🍷", "🥂", "🍾",
-            "🍕", "🍔", "🌮", "🌯", "🍜", "🍣", "🍱", "🥗", "🥘", "🍰", "🎂",
-            "🥩", "🧁", "🍩", "🍪", "🥐", "🍎", "🍊", "🍋", "🍇", "🫐",
-        ]),
-        ("Travel & Places", [
-            "✈️", "🚀", "🛸", "🚗", "🚙", "🚂", "🚢", "🛳️", "🚲",
-            "🗺️", "🌍", "🌎", "🌏", "🧭",
-            "🏖️", "🏔️", "🏕️", "🗼", "🗽", "🏯", "🏰",
-            "🏠", "🏢", "🏨", "⛪", "🎒", "🧳",
-        ]),
-        ("People & Social", [
-            "🧑", "👩", "👨", "👶", "🧓", "👥", "🤝", "🫂",
-            "🥰", "😊", "😎", "🤩", "🙌", "👏", "💪", "🫶",
-            "❤️", "🧡", "💛", "💚", "💙", "💜",
-        ]),
-        ("Symbols & Signals", [
-            "⭐", "🌟", "💫", "✨", "🎯", "🏆", "🥇", "🥈", "🥉", "🏅", "🎖️",
-            "🧠", "👀", "✅", "❌", "⚡", "🔮", "🎉", "🎊", "🧩",
-            "🔑", "🗝️", "🔓", "🔐", "⚠️", "🚫", "♾️",
-        ]),
-        ("Activities", [
-            "📚", "📖", "🎮", "⚽", "🏀", "🎾", "🏈", "⚾", "🏓", "🎯",
-            "🏃", "🧘", "🏋️", "🚴", "🤸", "🏊", "⛷️", "🏄", "🧗", "🤿",
-            "✍️", "🎲", "♟️", "🎳", "🎸", "🎻",
-            "🔬", "🔭", "🧪", "🧬",
-        ]),
+    /// Folder-friendly picks shown first, above the full catalogue.
+    static let suggestedSymbols = [
+        "folder", "folder.fill", "tray", "archivebox", "document", "bookmark", "star", "heart",
+        "tag", "flag", "pin", "house", "briefcase", "cart", "bag", "gift",
+        "book", "graduationcap", "lightbulb", "sparkles", "globe", "airplane", "fork.knife", "cup.and.saucer",
+        "music.note", "photo", "film", "gamecontroller", "paintpalette", "hammer", "leaf", "pawprint",
     ]
 }
 
@@ -328,6 +77,21 @@ private enum PickerMode: String, CaseIterable {
     case emoji   = "Emoji"
 }
 
+// MARK: - Grid cell identity
+
+/// A grid cell keyed by section + value. The same symbol can sit in several sections
+/// (Suggested, and Apple lists e.g. "camera.filters" under both Camera & Photos and Editing),
+/// and a LazyVGrid needs IDs unique across *all* its sections, not just within one.
+private struct GridCell<Value: Hashable>: Identifiable {
+    let section: String
+    let value: Value
+    var id: some Hashable { [AnyHashable(section), AnyHashable(value)] }
+
+    static func cells(_ values: [Value], in section: String) -> [GridCell] {
+        values.map { GridCell(section: section, value: $0) }
+    }
+}
+
 // MARK: - Popover
 
 private struct IconGridPopover: View {
@@ -336,24 +100,40 @@ private struct IconGridPopover: View {
     let onSelect: () -> Void
 
     @State private var mode = PickerMode.symbols
+    @State private var customEmoji = ""
+    @State private var category = Self.suggestedTitle
 
-    private let columns = Array(repeating: GridItem(.fixed(44), spacing: 6), count: 6)
+    private static let suggestedTitle = "Suggested"
+    private let catalog = IconCatalog.shared
+    private let columns = Array(repeating: GridItem(.fixed(44), spacing: 6), count: 8)
 
-    private var filteredSymbols: [(String, [String])] {
-        guard !search.isEmpty else { return IconPickerView.symbolsByCategory }
-        let q = search.lowercased()
-        return IconPickerView.symbolsByCategory.compactMap { (cat, symbols) in
-            let matched = symbols.filter { $0.lowercased().contains(q) }
-            return matched.isEmpty ? nil : (cat, matched)
-        }
+    private var categoryTitles: [String] {
+        [Self.suggestedTitle] + catalog.symbolSections.map(\.title)
     }
 
-    @State private var customEmoji = ""
+    /// One category at a time (or search results), never the whole catalogue in one scroll.
+    /// macOS caches every SF Symbol it has drawn (~85 KB each) for the rest of the session and
+    /// offers no way to purge it — scrolling all ~7,000 symbols cost ~500 MB. Showing a single
+    /// category keeps a typical visit to a few dozen MB.
+    private var symbolSections: [(title: String, items: [String])] {
+        if !search.isEmpty {
+            let results = catalog.searchSymbols(search)
+            return results.isEmpty ? [] : [("Results", results)]
+        }
+        if category == Self.suggestedTitle {
+            return [(category, IconPickerView.suggestedSymbols.filter(catalog.containsSymbol))]
+        }
+        return catalog.symbolSections
+            .filter { $0.title == category }
+            .map { ($0.title, $0.items) }
+    }
 
-    private var filteredEmoji: [(String, [String])] {
-        guard !search.isEmpty else { return IconPickerView.emojiByCategory }
-        let q = search.lowercased()
-        return IconPickerView.emojiByCategory.filter { $0.0.lowercased().contains(q) }
+    private var emojiSections: [(title: String, items: [IconCatalog.Emoji])] {
+        if !search.isEmpty {
+            let results = catalog.searchEmoji(search)
+            return results.isEmpty ? [] : [("Results", results)]
+        }
+        return catalog.emojiSections.map { ($0.title, $0.items) }
     }
 
     var body: some View {
@@ -374,7 +154,8 @@ private struct IconGridPopover: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .frame(width: 14)
-                TextField(mode == .symbols ? "Search icons…" : "Search categories…", text: $search)
+                TextField(mode == .symbols ? "Search symbols (e.g. money, heart, car)…" : "Search emoji (e.g. dog, pizza)…",
+                          text: $search)
                     .textFieldStyle(.plain)
                 if !search.isEmpty {
                     Button { search = "" } label: {
@@ -389,54 +170,86 @@ private struct IconGridPopover: View {
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
+            if mode == .symbols && search.isEmpty {
+                categoryBar
+            }
+
             Divider()
                 .padding(.top, 8)
 
             switch mode {
             case .symbols:
-                if filteredSymbols.isEmpty {
-                    Text("No icons found")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(40)
+                let sections = symbolSections
+                if sections.isEmpty {
+                    noResults("No symbols found")
                 } else {
-                    symbolsGrid
+                    symbolsGrid(sections)
+                        .id(category)   // start each category at the top
                 }
             case .emoji:
-                if filteredEmoji.isEmpty {
-                    Text("No categories found")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(40)
-                } else {
-                    emojiGrid
-                }
+                emojiGrid(emojiSections)
             }
         }
-        .frame(width: 336, height: 460)
+        .frame(width: 420, height: 500)
+    }
+
+    /// Horizontally scrolling category chips, like the tag filter bar.
+    private var categoryBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(categoryTitles, id: \.self) { title in
+                    let isSelected = category == title
+                    Button {
+                        category = title
+                    } label: {
+                        Text(title)
+                            .font(.caption)
+                            .fontWeight(isSelected ? .semibold : .regular)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.12),
+                                        in: Capsule())
+                            .foregroundStyle(isSelected ? Color.white : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .padding(.top, 8)
+    }
+
+    private func noResults(_ text: String) -> some View {
+        Text(text)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Symbol grid
 
-    private var symbolsGrid: some View {
+    /// One LazyVGrid with pinned section headers, so only visible cells of the ~7,000
+    /// symbols are ever built.
+    private func symbolsGrid(_ sections: [(title: String, items: [String])]) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach(filteredSymbols, id: \.0) { (category, symbols) in
-                    categorySection(title: category) {
-                        LazyVGrid(columns: columns, spacing: 6) {
-                            ForEach(symbols, id: \.self) { symbol in
-                                symbolCell(symbol)
-                            }
+            LazyVGrid(columns: columns, spacing: 6, pinnedViews: [.sectionHeaders]) {
+                ForEach(sections, id: \.title) { section in
+                    Section {
+                        ForEach(GridCell.cells(section.items, in: section.title)) { cell in
+                            symbolCell(cell.value)
                         }
+                    } header: {
+                        sectionHeader(section.title)
                     }
                 }
             }
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
     }
 
     private func symbolCell(_ symbol: String) -> some View {
-        let isSelected = selectedIcon == symbol
+        // Folders saved with a renamed symbol ("doc") still highlight its current name ("document").
+        let isSelected = catalog.canonicalSymbol(selectedIcon) == symbol
         return Button {
             selectedIcon = symbol
             search = ""
@@ -459,59 +272,72 @@ private struct IconGridPopover: View {
 
     // MARK: - Emoji grid
 
-    private var emojiGrid: some View {
+    private func emojiGrid(_ sections: [(title: String, items: [IconCatalog.Emoji])]) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Custom emoji input — tap the field, then use ⌃⌘Space or paste any emoji
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Custom")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 2)
-                    HStack(spacing: 8) {
-                        TextField("Type or paste any emoji…", text: $customEmoji)
-                            .textFieldStyle(.roundedBorder)
-                            .onChange(of: customEmoji) {
-                                let trimmed = customEmoji.trimmingCharacters(in: .whitespaces)
-                                guard !trimmed.isEmpty && !isSFSymbolName(trimmed) else { return }
-                                // Swift's Character type handles multi-scalar grapheme clusters,
-                                // so prefix(1) correctly captures any single emoji including ZWJ sequences.
-                                let first = String(trimmed.prefix(1))
-                                if customEmoji != first { customEmoji = first }
-                            }
-                        Button("Use") {
-                            let trimmed = customEmoji.trimmingCharacters(in: .whitespaces)
-                            if !trimmed.isEmpty {
-                                selectedIcon = trimmed
-                                onSelect()
-                            }
-                        }
-                        .disabled(customEmoji.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    Text("Tip: place cursor in the field and press ⌃⌘Space for the system emoji picker.")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                customEmojiInput
+                    .padding(.top, 12)
 
-                ForEach(filteredEmoji, id: \.0) { (category, emojis) in
-                    categorySection(title: category) {
-                        LazyVGrid(columns: columns, spacing: 6) {
-                            ForEach(emojis, id: \.self) { emoji in
-                                emojiCell(emoji)
+                if sections.isEmpty {
+                    noResults("No emoji found")
+                        .padding(.top, 40)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 6, pinnedViews: [.sectionHeaders]) {
+                        ForEach(sections, id: \.title) { section in
+                            Section {
+                                ForEach(GridCell.cells(section.items, in: section.title)) { cell in
+                                    emojiCell(cell.value)
+                                }
+                            } header: {
+                                sectionHeader(section.title)
                             }
                         }
                     }
                 }
             }
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
     }
 
-    private func emojiCell(_ emoji: String) -> some View {
-        let isSelected = selectedIcon == emoji
+    /// Custom emoji input — tap the field, then use ⌃⌘Space or paste any emoji.
+    private var customEmojiInput: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Custom")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 2)
+            HStack(spacing: 8) {
+                TextField("Type or paste any emoji…", text: $customEmoji)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: customEmoji) {
+                        let trimmed = customEmoji.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty && !isSFSymbolName(trimmed) else { return }
+                        // Swift's Character type handles multi-scalar grapheme clusters,
+                        // so prefix(1) correctly captures any single emoji including ZWJ sequences.
+                        let first = String(trimmed.prefix(1))
+                        if customEmoji != first { customEmoji = first }
+                    }
+                Button("Use") {
+                    let trimmed = customEmoji.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty {
+                        selectedIcon = trimmed
+                        onSelect()
+                    }
+                }
+                .disabled(customEmoji.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Text("Tip: place cursor in the field and press ⌃⌘Space for the system emoji picker.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func emojiCell(_ item: IconCatalog.Emoji) -> some View {
+        let isSelected = selectedIcon == item.emoji
         return Button {
-            selectedIcon = emoji
+            selectedIcon = item.emoji
             search = ""
             onSelect()
         } label: {
@@ -520,28 +346,25 @@ private struct IconGridPopover: View {
                     .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
-                Text(emoji)
+                Text(item.emoji)
                     .font(.system(size: 20))
             }
             .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
+        .help(item.name)
     }
 
-    // MARK: - Shared section layout
+    // MARK: - Shared section header
 
-    @ViewBuilder
-    private func categorySection<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 2)
-            content()
-        }
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
+            .padding(.vertical, 6)
+            .background(.bar)
     }
 }

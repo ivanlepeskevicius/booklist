@@ -46,6 +46,10 @@ struct MasonryView: View {
             .focusable()
             .focusEffectDisabled()
             .focused($isFocused)
+            // Edit › Select All / ⌘A while the grid has focus (text fields keep their own Select All).
+            .onCommand(#selector(NSResponder.selectAll(_:))) {
+                selectedIDs = Set(bookmarks.map(\.id))
+            }
             // Arrow = move the selection; Shift+arrow = add the next card to it.
             .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { press in
                 moveSelection(press.key, extending: press.modifiers.contains(.shift), proxy: proxy)
