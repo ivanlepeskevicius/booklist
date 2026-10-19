@@ -107,6 +107,28 @@ enum FolderTree {
         return true
     }
 
+    /// Whether `folder` can be placed right before/after `target`, as its sibling — not next
+    /// to itself, and not next to one of its own descendants (that would make it its own ancestor).
+    static func canPlace(_ folder: Folder, besides target: Folder, folders: [Folder]) -> Bool {
+        target.id != folder.id && !contains(targetID: target.id, in: folder.id, folders: folders)
+    }
+
+    /// Places `folder` directly before or after `target`, under `target`'s parent (reordering if
+    /// they're already siblings), and renumbers that level's sortOrder. Returns false if not allowed.
+    @discardableResult
+    static func place(_ folder: Folder, besides target: Folder, after: Bool, folders: [Folder]) -> Bool {
+        guard canPlace(folder, besides: target, folders: folders) else { return false }
+        let parent = target.parent
+        var siblings = folders
+            .filter { $0.parent?.id == parent?.id && $0.id != folder.id }
+            .sorted { $0.sortOrder < $1.sortOrder }
+        guard let index = siblings.firstIndex(where: { $0.id == target.id }) else { return false }
+        siblings.insert(folder, at: after ? index + 1 : index)
+        folder.parent = parent
+        for (order, sibling) in siblings.enumerated() { sibling.sortOrder = order }
+        return true
+    }
+
     /// All folders in depth-first tree order (siblings by sortOrder), each with a
     /// "Parent › Child" path label — for folder picker menus.
     static func flattened(_ folders: [Folder]) -> [(folder: Folder, path: String)] {

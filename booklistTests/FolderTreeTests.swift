@@ -299,6 +299,97 @@ struct FolderTreeTests {
         }
     }
 
+    // MARK: - FolderTree.place (drag above/below a folder)
+
+    @Suite("place")
+    struct PlaceTests {
+
+        private func makeContext() throws -> ModelContext {
+            let config = ModelConfiguration(isStoredInMemoryOnly: true)
+            let container = try ModelContainer(
+                for: Bookmark.self, Folder.self, Tag.self,
+                configurations: config
+            )
+            return ModelContext(container)
+        }
+
+        /// Top-level folders in sortOrder.
+        private func order(_ folders: [Folder], parent: Folder? = nil) -> [String] {
+            folders.filter { $0.parent?.id == parent?.id }.sorted { $0.sortOrder < $1.sortOrder }.map(\.name)
+        }
+
+        @Test("reorders siblings: drop C above A")
+        func reorderBefore() throws {
+            let ctx = try makeContext()
+            let a = Folder(name: "A", sortOrder: 0), b = Folder(name: "B", sortOrder: 1), c = Folder(name: "C", sortOrder: 2)
+            [a, b, c].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(FolderTree.place(c, besides: a, after: false, folders: folders))
+            #expect(order(folders) == ["C", "A", "B"])
+        }
+
+        @Test("reorders siblings: drop A below B")
+        func reorderAfter() throws {
+            let ctx = try makeContext()
+            let a = Folder(name: "A", sortOrder: 0), b = Folder(name: "B", sortOrder: 1), c = Folder(name: "C", sortOrder: 2)
+            [a, b, c].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(FolderTree.place(a, besides: b, after: true, folders: folders))
+            #expect(order(folders) == ["B", "A", "C"])
+        }
+
+        @Test("placing next to a nested folder moves it to that level")
+        func placeIntoOtherLevel() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work", sortOrder: 0)
+            let design = Folder(name: "Design", sortOrder: 0, parent: work)
+            let home = Folder(name: "Home", sortOrder: 1)
+            [work, design, home].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(FolderTree.place(home, besides: design, after: true, folders: folders))
+            #expect(home.parent?.id == work.id)
+            #expect(order(folders, parent: work) == ["Design", "Home"])
+            #expect(order(folders) == ["Work"])
+        }
+
+        @Test("can't place a folder next to itself or inside its own subtree")
+        func noCycles() throws {
+            let ctx = try makeContext()
+            let work = Folder(name: "Work")
+            let design = Folder(name: "Design", parent: work)
+            [work, design].forEach(ctx.insert)
+            try ctx.save()
+            let folders = try ctx.fetch(FetchDescriptor<Folder>())
+
+            #expect(!FolderTree.place(work, besides: work, after: true, folders: folders))
+            #expect(!FolderTree.place(work, besides: design, after: true, folders: folders))  // would nest Work in itself
+            #expect(work.parent == nil)
+        }
+    }
+
+    // MARK: - FolderDropZone (top quarter / middle / bottom quarter)
+
+    @Suite("drop zone")
+    struct DropZoneTests {
+        @Test("top quarter is above, middle is inside, bottom quarter is below")
+        func zones() {
+            #expect(FolderDropZone(y: 2, rowHeight: 28) == .before)
+            #expect(FolderDropZone(y: 14, rowHeight: 28) == .into)
+            #expect(FolderDropZone(y: 26, rowHeight: 28) == .after)
+        }
+
+        @Test("unknown row height falls back to inside")
+        func zeroHeight() {
+            #expect(FolderDropZone(y: 0, rowHeight: 0) == .into)
+        }
+    }
+
     // MARK: - FolderTree.flattened
 
     @Suite("flattened")

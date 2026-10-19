@@ -25,7 +25,7 @@ struct SidebarView: View {
 
     // Drop target state for the Inbox row
     @State private var isInboxDropTargeted = false
-    @State private var isLibraryDropTargeted = false
+    @State private var libraryDropZone: FolderDropZone?
 
     private var inboxCount: Int {
         allBookmarks.filter { $0.collection == nil && $0.itemType == .bookmark }.count
@@ -75,29 +75,19 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .selectionDisabled()
 
+                // Reordering and nesting are both handled by FolderRowView's drag & drop.
                 ForEach(rootFolders) { folder in
                     FolderRowView(folder: folder, allFolders: allFolders, selection: $selection)
                 }
-                .onMove { indices, destination in
-                    reorderFolders(indices: indices, destination: destination, among: rootFolders)
-                }
             } header: {
-                // Dropping a folder on the "Library" header makes it top-level.
+                // Dropping a folder on the "Library" header makes it top-level (placed last).
                 Text("Library")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    .dropDestination(for: FolderTransfer.self) { items, _ in
-                        guard let id = items.first?.id,
-                              let dragged = allFolders.first(where: { $0.id == id }) else { return false }
-                        return FolderTree.move(dragged, into: nil, folders: allFolders)
-                    } isTargeted: { isLibraryDropTargeted = $0 }
-                    .overlay {
-                        if isLibraryDropTargeted {
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.accentColor, lineWidth: 2)
-                                .allowsHitTesting(false)
-                        }
-                    }
+                    .onDrop(of: [.folderTransfer], delegate: FolderDropDelegate(
+                        target: nil, allFolders: allFolders, rowHeight: 0, zone: $libraryDropZone
+                    ))
+                    .folderDropIndicator(libraryDropZone)
             }
         }
         .listStyle(.sidebar)
@@ -186,16 +176,6 @@ struct SidebarView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This folder and all its subfolders will be removed. Bookmarks will move to Inbox.")
-        }
-    }
-
-    // MARK: - Folder reordering
-
-    private func reorderFolders(indices: IndexSet, destination: Int, among sorted: [Folder]) {
-        var mutable = sorted
-        mutable.move(fromOffsets: indices, toOffset: destination)
-        for (i, f) in mutable.enumerated() {
-            f.sortOrder = i
         }
     }
 

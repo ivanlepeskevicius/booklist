@@ -20,7 +20,8 @@ struct FolderRowView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var isBookmarkDropTargeted = false
-    @State private var isFolderDropTargeted = false
+    @State private var folderDropZone: FolderDropZone?
+    @State private var rowHeight: CGFloat = 0
 
     private var children: [Folder] {
         allFolders
@@ -63,9 +64,6 @@ struct FolderRowView: View {
                 ForEach(children) { child in
                     FolderRowView(folder: child, allFolders: allFolders, selection: $selection, seenIDs: seenIDs)
                 }
-                .onMove { indices, destination in
-                    reorderFolders(indices: indices, destination: destination, among: children)
-                }
             } label: {
                 folderLabel
             }
@@ -86,29 +84,13 @@ struct FolderRowView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        // Drag a folder onto another to nest it. Drops into itself or its own subfolders are refused.
-        .draggable(FolderTransfer(id: folder.id))
-        .dropDestination(for: FolderTransfer.self) { items, _ in
-            guard let id = items.first?.id,
-                  let dragged = allFolders.first(where: { $0.id == id }) else { return false }
-            return FolderTree.move(dragged, into: folder, folders: allFolders)
-        } isTargeted: { isFolderDropTargeted = $0 }
-        .overlay {
-            if isFolderDropTargeted {
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.accentColor, lineWidth: 2)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
-
-    // MARK: - Child reordering
-
-    private func reorderFolders(indices: IndexSet, destination: Int, among sorted: [Folder]) {
-        var mutable = sorted
-        mutable.move(fromOffsets: indices, toOffset: destination)
-        for (i, f) in mutable.enumerated() {
-            f.sortOrder = i
-        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowHeight = $0 }
+        // One drag does both reorder and nest (replaces List's onMove, which stops receiving
+        // drags once rows are draggable): top quarter = above, middle = inside, bottom = below.
+        .onDrag { FolderDrag.itemProvider(for: folder) }
+        .onDrop(of: [.folderTransfer], delegate: FolderDropDelegate(
+            target: folder, allFolders: allFolders, rowHeight: rowHeight, zone: $folderDropZone
+        ))
+        .folderDropIndicator(folderDropZone)
     }
 }
