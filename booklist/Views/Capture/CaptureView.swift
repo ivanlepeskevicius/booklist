@@ -118,6 +118,7 @@ struct CaptureView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     urlField
+                    organizationSection
                     if let dup = duplicateBookmark {
                         duplicateBanner(dup)
                     } else {
@@ -131,7 +132,6 @@ struct CaptureView: View {
                             }
                             wishlistSection
                             noteField
-                            organizationSection
                             tagsSection
                             thumbnailSection
                         }
@@ -345,24 +345,25 @@ struct CaptureView: View {
                 .foregroundStyle(.secondary)
 
             Menu {
+                // New Folder first — the folder list below grows, this should stay one click away.
+                Button {
+                    showingNewFolder = true
+                } label: {
+                    Label("New Folder…", systemImage: "folder.badge.plus")
+                }
+                Divider()
                 Button {
                     selectedFolderID = nil
                 } label: {
                     Label("Inbox (no folder)", systemImage: "tray")
                 }
-                Divider()
+                if !folderOptions.isEmpty { Divider() }
                 ForEach(folderOptions, id: \.id) { option in
                     Button {
                         selectedFolderID = option.id
                     } label: {
                         Label(option.label, systemImage: option.icon)
                     }
-                }
-                if !folderOptions.isEmpty { Divider() }
-                Button {
-                    showingNewFolder = true
-                } label: {
-                    Label("New Folder…", systemImage: "folder.badge.plus")
                 }
             } label: {
                 HStack {

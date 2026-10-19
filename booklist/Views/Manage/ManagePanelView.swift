@@ -29,8 +29,8 @@ struct ManagePanelView: View {
             // TagPickerField dropdown, making notes and tags impossible to edit.
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    detailsGroup
                     locationGroup
+                    detailsGroup
                     tagsGroup
                         .zIndex(2)   // lets the tag dropdown float above the section below
                     typeGroup
@@ -106,24 +106,25 @@ struct ManagePanelView: View {
     private var locationGroup: some View {
         formGroup(title: "Location") {
             Menu {
+                // New Folder first — the folder list below grows, this should stay one click away.
+                Button {
+                    showingNewFolder = true
+                } label: {
+                    Label("New Folder…", systemImage: "folder.badge.plus")
+                }
+                Divider()
                 Button {
                     bookmark.collection = nil
                 } label: {
                     Label("Inbox (no folder)", systemImage: "tray")
                 }
-                Divider()
+                if !allFolders.isEmpty { Divider() }
                 ForEach(FolderTree.flattened(allFolders), id: \.folder.id) { entry in
                     Button {
                         bookmark.collection = entry.folder
                     } label: {
                         Label(entry.path, systemImage: entry.folder.icon)
                     }
-                }
-                if !allFolders.isEmpty { Divider() }
-                Button {
-                    showingNewFolder = true
-                } label: {
-                    Label("New Folder…", systemImage: "folder.badge.plus")
                 }
             } label: {
                 HStack {
