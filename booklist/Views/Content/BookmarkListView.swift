@@ -10,8 +10,9 @@ struct BookmarkListView: View {
     var onTagTap: ((Tag) -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
+    @Query private var allFolders: [Folder]
+    @Query(sort: \Tag.name) private var allTags: [Tag]
     @State private var sortOrder = [KeyPathComparator<Bookmark>(\Bookmark.dateAdded, order: .reverse)]
-    @State private var showDeleteConfirmFor: Bookmark?
 
     @AppStorage("listShowSource")     private var listShowSource     = true
     @AppStorage("listShowSaved")      private var listShowSaved      = true
@@ -31,9 +32,7 @@ struct BookmarkListView: View {
                     faviconView(bookmark)
                     VStack(alignment: .leading, spacing: 2) {
                         Button {
-                            guard let url = URL(string: bookmark.url) else { return }
-                            bookmark.lastOpenedDate = Date()
-                            NSWorkspace.shared.open(url)
+                            open(bookmark)
                         } label: {
                             Text(bookmark.title)
                                 .fontWeight(.medium)
@@ -143,9 +142,7 @@ struct BookmarkListView: View {
                     }
 
                     Button {
-                        guard let url = URL(string: bookmark.url) else { return }
-                        bookmark.lastOpenedDate = Date()
-                        NSWorkspace.shared.open(url)
+                        open(bookmark)
                     } label: {
                         Image(systemName: "arrow.up.right.square")
                     }
@@ -159,20 +156,33 @@ struct BookmarkListView: View {
                     .help("Edit")
 
                     Button(role: .destructive) {
-                        showDeleteConfirmFor = bookmark
+                        delete([bookmark])
                     } label: {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.red)
-                    .help("Delete")
+                    .help("Delete (⌘Z to undo)")
                 }
             }
             .width(100)
         }
+        // Mirrors the card context menu so both view modes offer the same actions.
         .contextMenu(forSelectionType: UUID.self) { selection in
             let targets = bookmarks.filter { selection.contains($0.id) }
+            if let single = targets.first, targets.count == 1 {
+                if single.itemType == .bookmark {
+                    Button("Open in Reader") { onRead(single) }
+                }
+                Button("Open in Browser") { open(single) }
+                Divider()
+                Button("Edit") { onManage(single) }
+            } else if !targets.isEmpty {
+                Button("Open \(targets.count) Items in Browser") { targets.forEach(open) }
+                Divider()
+            }
             if !targets.isEmpty {
+                BookmarkOrganizeMenu(targets: targets, folders: allFolders, tags: allTags)
                 let shareTitle = targets.count == 1 ? targets[0].title : "\(targets.count) Items"
                 ShareLink(
                     item: BookmarksExport(bookmarks: targets, title: shareTitle),
@@ -181,24 +191,24 @@ struct BookmarkListView: View {
                     Label(targets.count == 1 ? "Share" : "Share \(targets.count) Items",
                           systemImage: "square.and.arrow.up")
                 }
+                Divider()
+                Button(targets.count == 1 ? "Delete" : "Delete \(targets.count) Items", role: .destructive) {
+                    delete(targets)
+                }
             }
-        } primaryAction: { _ in }
-        .confirmationDialog(
-            "Delete \"\(showDeleteConfirmFor?.title ?? "")\"?",
-            isPresented: Binding(
-                get: { showDeleteConfirmFor != nil },
-                set: { if !$0 { showDeleteConfirmFor = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let b = showDeleteConfirmFor { modelContext.delete(b) }
-                showDeleteConfirmFor = nil
-            }
-            Button("Cancel", role: .cancel) { showDeleteConfirmFor = nil }
-        } message: {
-            Text("This cannot be undone.")
+        } primaryAction: { selection in
+            // Double-click / Return opens the row(s) in the browser.
+            BookmarkBulkActions.open(bookmarks.filter { selection.contains($0.id) })
         }
+    }
+
+    private func delete(_ targets: [Bookmark]) {
+        selectedIDs.subtract(targets.map(\.id))
+        BookmarkBulkActions.delete(targets, from: modelContext)
+    }
+
+    private func open(_ bookmark: Bookmark) {
+        BookmarkBulkActions.open([bookmark])
     }
 
     @ViewBuilder

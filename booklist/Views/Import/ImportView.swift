@@ -48,6 +48,7 @@ struct ImportView: View {
     @State private var reviewFaviconURL:    String?   = nil
     @State private var reviewDescription:   String?   = nil
     @State private var reviewIsFetching:    Bool      = false
+    @State private var showingNewFolder:    Bool      = false
 
     @AppStorage("preferredCurrency") private var preferredCurrency = Locale.current.currency?.identifier ?? "USD"
 
@@ -68,6 +69,11 @@ struct ImportView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 520, height: 580)
+        .sheet(isPresented: $showingNewFolder) {
+            FolderFormView(mode: .add(parentID: nil)) { newFolder in
+                reviewFolderID = newFolder.id
+            }
+        }
     }
 
     // MARK: - Headers
@@ -324,6 +330,43 @@ struct ImportView: View {
                                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                         }
 
+                        // Folder picker
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Add to", systemImage: "folder")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Menu {
+                                Button { reviewFolderID = nil } label: {
+                                    Label("Inbox (no folder)", systemImage: "tray")
+                                }
+                                Divider()
+                                ForEach(folderOptions, id: \.id) { option in
+                                    Button { reviewFolderID = option.id } label: {
+                                        Label(option.label, systemImage: option.icon)
+                                    }
+                                }
+                                if !folderOptions.isEmpty { Divider() }
+                                Button { showingNewFolder = true } label: {
+                                    Label("New Folder…", systemImage: "folder.badge.plus")
+                                }
+                            } label: {
+                                HStack {
+                                    let folder = reviewFolderID.flatMap { id in allFolders.first { $0.id == id } }
+                                    Label(
+                                        folder?.name ?? "Inbox",
+                                        systemImage: folder?.icon ?? "tray"
+                                    )
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(10)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                            }
+                            .menuStyle(.borderlessButton)
+                        }
+
                         // Fetch spinner
                         if reviewIsFetching {
                             HStack(spacing: 8) {
@@ -399,39 +442,6 @@ struct ImportView: View {
                                 reviewImages.append(savedURL)
                             }
                             reviewSelectedImage = savedURL
-                        }
-
-                        // Folder picker
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("Add to", systemImage: "folder")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Menu {
-                                Button { reviewFolderID = nil } label: {
-                                    Label("Inbox (no folder)", systemImage: "tray")
-                                }
-                                Divider()
-                                ForEach(folderOptions, id: \.id) { option in
-                                    Button { reviewFolderID = option.id } label: {
-                                        Label(option.label, systemImage: option.icon)
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    let folder = reviewFolderID.flatMap { id in allFolders.first { $0.id == id } }
-                                    Label(
-                                        folder?.name ?? "Inbox",
-                                        systemImage: folder?.icon ?? "tray"
-                                    )
-                                    Spacer()
-                                    Image(systemName: "chevron.up.chevron.down")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(10)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                            }
-                            .menuStyle(.borderlessButton)
                         }
                     }
                     .padding(20)
@@ -633,7 +643,7 @@ struct ImportView: View {
         reviewTags          = item.tags.compactMap { name in allTags.first { $0.name == name } }
         reviewIsWishlist    = item.isWishlistItem
         reviewPrice         = item.price ?? ""
-        reviewFolderID      = nil
+        // reviewFolderID intentionally not reset — persists from the previous item
         reviewImages        = item.imageURL.map { [$0] } ?? []
         reviewSelectedImage = item.imageURL
         reviewFaviconURL    = nil
@@ -670,6 +680,7 @@ struct ImportView: View {
         guard reviewItems.indices.contains(reviewIndex) else { return }
         let item   = reviewItems[reviewIndex]
         let folder = reviewFolderID.flatMap { id in allFolders.first { $0.id == id } }
+        let imageToDownload = reviewSelectedImage
 
         let bookmark = Bookmark(
             title:            reviewTitle.isEmpty ? item.url : reviewTitle,
@@ -686,6 +697,18 @@ struct ImportView: View {
         )
         modelContext.insert(bookmark)
         reviewSaved += 1
+
+        // Download the selected remote image to local storage so it survives app relaunches
+        if let remote = imageToDownload,
+           let remoteURL = URL(string: remote),
+           remoteURL.scheme == "https" || remoteURL.scheme == "http" {
+            Task {
+                if let localURL = try? await ImageStore.download(from: remoteURL) {
+                    bookmark.selectedImageURL = localURL
+                }
+            }
+        }
+
         advance()
     }
 

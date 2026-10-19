@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Result type
 
-struct PageMetadata {
+nonisolated struct PageMetadata {
     let title: String
     let description: String?
     let faviconURL: String?
@@ -17,7 +17,7 @@ struct PageMetadata {
 
 // MARK: - Errors
 
-enum MetadataFetchError: LocalizedError {
+nonisolated enum MetadataFetchError: LocalizedError {
     case invalidURL
     case network(Error)
     case decodingFailed
@@ -43,9 +43,12 @@ enum MetadataFetchError: LocalizedError {
 
 // MARK: - Fetcher
 
-struct MetadataFetcher {
+/// `nonisolated` + `@concurrent` keep the heavy regex parsing of whole web pages
+/// off the main thread (the project defaults everything to the main actor).
+nonisolated struct MetadataFetcher {
 
     /// Fetches the HTML at `urlString` and returns extracted metadata.
+    @concurrent
     static func fetch(urlString: String) async throws -> PageMetadata {
         guard let url = URL(string: urlString) else {
             throw MetadataFetchError.invalidURL
@@ -397,6 +400,10 @@ struct MetadataFetcher {
                 // Skip if URL contains a WxH size hint where both sides are tiny (e.g. "32x32").
                 if tinyDimensionInURL(src) { return nil }
 
+                // Skip Amazon CDN thumbnails that embed a small size modifier in the URL
+                // (e.g. "_SS40_", "_SX38_", "_SL150_") — these bypass the WxH check above.
+                if let amazonSize = amazonImageSize(src), amazonSize < 200 { return nil }
+
                 return src
             }
     }
@@ -412,6 +419,22 @@ struct MetadataFetcher {
             if w < 250 && h < 250 { return true }
         }
         return false
+    }
+
+    /// Returns the largest pixel size found in Amazon CDN URL size modifiers such as
+    /// `_SL150_`, `_SS40_`, `_SX38_`, `_SY75_`, or `_UL320_`.
+    /// Returns nil if the URL is not an Amazon CDN URL or has no recognised modifier.
+    private static func amazonImageSize(_ url: String) -> Int? {
+        let lower = url.lowercased()
+        guard lower.contains("media-amazon.com") || lower.contains("ssl-images-amazon.com") else { return nil }
+        guard let regex = try? NSRegularExpression(pattern: #"_(?:SL|SS|SX|SY|UL)(\d+)_"#,
+                                                   options: .caseInsensitive) else { return nil }
+        let ns = NSRange(url.startIndex..., in: url)
+        let sizes = regex.matches(in: url, range: ns).compactMap { match -> Int? in
+            guard let r = Range(match.range(at: 1), in: url) else { return nil }
+            return Int(url[r])
+        }
+        return sizes.max()
     }
 
     // MARK: - URL resolution

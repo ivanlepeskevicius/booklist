@@ -6,7 +6,8 @@ import Foundation
 // Shadow Testing.Tag so our SwiftData Tag model is unambiguous throughout this file.
 private typealias Tag = booklist.Tag
 
-@Suite("SyncService restore + buildSnapshot")
+// Serialized: several tests read and write the same shared UserDefaults keys.
+@Suite("SyncService restore + buildSnapshot", .serialized)
 struct SyncServiceRestoreTests {
 
     // MARK: - Helper

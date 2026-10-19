@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import ServiceManagement
+import KeyboardShortcuts
 
 struct AppSettingsView: View {
     @Query(sort: \Tag.name) private var allTags: [Tag]
@@ -58,14 +59,8 @@ struct AppSettingsView: View {
             generalTab
                 .tabItem { Label("General", systemImage: "gear") }
 
-            cardsTab
-                .tabItem { Label("Cards", systemImage: "rectangle.grid.2x2") }
-
-            listTab
-                .tabItem { Label("List", systemImage: "list.bullet") }
-
-            wishlistTab
-                .tabItem { Label("Wishlist", systemImage: "cart") }
+            displayTab
+                .tabItem { Label("Display", systemImage: "rectangle.grid.2x2") }
 
             tagsTab
                 .tabItem { Label("Tags", systemImage: "tag") }
@@ -97,8 +92,10 @@ struct AppSettingsView: View {
                 .pickerStyle(.segmented)
             }
 
-            Section("Shortcuts") {
-                Picker("New capture", selection: $captureShortcutKey) {
+            Section {
+                KeyboardShortcuts.Recorder("Save link from anywhere", name: .captureFromAnywhere)
+
+                Picker("Save link in booklist", selection: $captureShortcutKey) {
                     Text("⌘T").tag("t")
                     Text("⌘N").tag("n")
                     Text("⌘B").tag("b")
@@ -106,6 +103,11 @@ struct AppSettingsView: View {
                     Text("None").tag("none")
                 }
                 .pickerStyle(.menu)
+            } header: {
+                Text("Shortcuts")
+            } footer: {
+                Text("Copy a link in any app, press your shortcut, and booklist opens with it ready to save.")
+                    .foregroundStyle(.secondary)
             }
 
             Section("Reader") {
@@ -114,6 +116,14 @@ struct AppSettingsView: View {
                     Text("Reader").tag(false)
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section("Wishlist") {
+                Picker("Currency", selection: $preferredCurrency) {
+                    ForEach(currencies, id: \.code) { currency in
+                        Text(currency.label).tag(currency.code)
+                    }
+                }
             }
 
             Section("System") {
@@ -154,9 +164,9 @@ struct AppSettingsView: View {
         .formStyle(.grouped)
     }
 
-    // MARK: - Cards tab
+    // MARK: - Display tab
 
-    private var cardsTab: some View {
+    private var displayTab: some View {
         Form {
             Section("Typography") {
                 Picker("Font", selection: $cardFontName) {
@@ -235,14 +245,7 @@ struct AppSettingsView: View {
                     }
                 }
             }
-        }
-        .formStyle(.grouped)
-    }
 
-    // MARK: - List tab
-
-    private var listTab: some View {
-        Form {
             Section {
                 Toggle("Source", isOn: $listShowSource)
                 Toggle("Saved", isOn: $listShowSaved)
@@ -250,25 +253,10 @@ struct AppSettingsView: View {
                 Toggle("Tags", isOn: $listShowTags)
                 Toggle("Price", isOn: $listShowPrice)
             } header: {
-                Text("Visible Columns")
+                Text("List Columns")
             } footer: {
                 Text("Title and Actions columns are always visible.")
                     .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - Wishlist tab
-
-    private var wishlistTab: some View {
-        Form {
-            Section("Currency") {
-                Picker("Currency", selection: $preferredCurrency) {
-                    ForEach(currencies, id: \.code) { currency in
-                        Text(currency.label).tag(currency.code)
-                    }
-                }
             }
         }
         .formStyle(.grouped)

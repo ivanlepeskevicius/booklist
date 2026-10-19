@@ -41,7 +41,8 @@ struct CaptureView: View {
     @FocusState private var focused: Field?
 
     // ── Debounce ─────────────────────────────────────────────────
-    @State private var fetchTask: Task<Void, Never>?
+    @State private var fetchTask:      Task<Void, Never>?
+    @State private var screenshotTask: Task<Void, Never>?
 
     // ── Computed ─────────────────────────────────────────────────
 
@@ -54,7 +55,8 @@ struct CaptureView: View {
             : "https://" + trimmed
     }
 
-    private var canSave: Bool { !effectiveURL.isEmpty && !title.isEmpty }
+    // Title is optional — save() falls back to the URL when it's empty.
+    private var canSave: Bool { !effectiveURL.isEmpty }
 
     private var currencySymbol: String {
         let symbols: [String: String] = [
@@ -129,8 +131,8 @@ struct CaptureView: View {
                             }
                             wishlistSection
                             noteField
-                            tagsSection
                             organizationSection
+                            tagsSection
                             thumbnailSection
                         }
                     }
@@ -152,12 +154,25 @@ struct CaptureView: View {
         }
         // When opened via deep link / Share Extension, pre-fill and fetch immediately.
         .task {
-            guard !initialURL.isEmpty else { return }
+            guard !initialURL.isEmpty else {
+                // Most captures start right after copying a link — pre-fill it.
+                // Setting urlString triggers the debounced fetch via onChange.
+                if let clip = NSPasteboard.general.string(forType: .string)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   clip.hasPrefix("https://") || clip.hasPrefix("http://"),
+                   !clip.contains(where: \.isWhitespace) {
+                    urlString = clip
+                }
+                return
+            }
             urlString = initialURL
             if !initialTitle.isEmpty { title = initialTitle }
             // Yield one cycle so the URL field renders before the spinner appears.
             try? await Task.sleep(for: .milliseconds(50))
             await fetchMetadata(for: effectiveURL)
+        }
+        .onDisappear {
+            screenshotTask?.cancel()
         }
     }
 
@@ -419,8 +434,10 @@ struct CaptureView: View {
             Spacer()
             Button("Cancel") { dismiss() }
                 .keyboardShortcut(.escape)
+            // ⌘Return, not plain Return — Return must insert a newline in the multi-line note field.
             Button(isWishlistItem ? "Save to Wishlist" : "Save Bookmark") { save() }
-                .keyboardShortcut(.return)
+                .keyboardShortcut(.return, modifiers: .command)
+                .help("Save (⌘↩)")
                 .buttonStyle(.borderedProminent)
                 .disabled(!canSave || duplicateBookmark != nil)
         }
@@ -434,6 +451,7 @@ struct CaptureView: View {
         hasFetched = false
         fetchError = nil
         fetchTask?.cancel()
+        screenshotTask?.cancel()
         fetchTask = Task {
             // Debounce — wait for the user to stop typing
             try? await Task.sleep(for: .milliseconds(600))
@@ -446,6 +464,7 @@ struct CaptureView: View {
     private func triggerFetch(for urlString: String) {
         guard !urlString.isEmpty, urlString.contains(".") else { return }
         fetchTask?.cancel()
+        screenshotTask?.cancel()
         fetchTask = Task { await fetchMetadata(for: urlString) }
     }
 
@@ -474,7 +493,17 @@ struct CaptureView: View {
                     author: meta.redditAuthor ?? ""
                 )
             }
-            hasFetched       = true
+            hasFetched = true
+            // If no images were found by any means, take a screenshot as fallback
+            if candidateImages.isEmpty {
+                screenshotTask = Task {
+                    if let localURL = await ScreenshotService.capture(urlString: urlString),
+                       !Task.isCancelled {
+                        candidateImages = [localURL]
+                        selectedImageURL = localURL
+                    }
+                }
+            }
         } catch {
             fetchError = error.localizedDescription
             // Still let the user save manually
@@ -503,6 +532,7 @@ struct CaptureView: View {
     private func save() {
         let tags   = selectedTags
         let folder = selectedFolder
+        let imageToDownload = selectedImageURL
 
         let bookmark = Bookmark(
             title: title.isEmpty ? effectiveURL : title,
@@ -518,6 +548,18 @@ struct CaptureView: View {
             tags: tags
         )
         modelContext.insert(bookmark)
+
+        // Download the selected remote image to local storage so it survives app relaunches
+        if let remote = imageToDownload,
+           let remoteURL = URL(string: remote),
+           remoteURL.scheme == "https" || remoteURL.scheme == "http" {
+            Task {
+                if let localURL = try? await ImageStore.download(from: remoteURL) {
+                    bookmark.selectedImageURL = localURL
+                }
+            }
+        }
+
         dismiss()
     }
 }

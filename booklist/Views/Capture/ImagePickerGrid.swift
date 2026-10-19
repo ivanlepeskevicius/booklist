@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// A grid of thumbnail images where exactly one can be selected.
 /// Shows the first 6 images by default; a "Show more" button reveals the rest.
@@ -62,43 +63,32 @@ private struct ImagePickerCell: View {
     let onSelect: () -> Void
     let onFail: () -> Void
 
-    @State private var hasFailed = false
+    @State private var loadedImage: NSImage?
+    @State private var isLoading  = true
+    @State private var hasFailed  = false
 
     var body: some View {
         Button(action: onSelect) {
             ZStack(alignment: .topTrailing) {
-                // Thumbnail — Color.clear owns the layout frame; AsyncImage goes in an
-                // overlay so its natural size never affects row height. .fit mode ensures
-                // the full image is always visible; .quaternary fill covers the letterbox gaps.
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 120)
                     .background(.quaternary)
                     .overlay {
-                        AsyncImage(url: URL(string: urlString)) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            case .failure:
-                                Color.clear.onAppear {
-                                    guard !hasFailed else { return }
-                                    hasFailed = true
-                                    onFail()
-                                }
-                            default:
-                                Image(systemName: "photo")
-                                    .foregroundStyle(.tertiary)
-                            }
+                        if let img = loadedImage {
+                            Image(nsImage: img)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } else if isLoading {
+                            Image(systemName: "photo")
+                                .foregroundStyle(.tertiary)
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2.5)
-                }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2.5)
+                    }
 
-                // Selection checkmark
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .symbolRenderingMode(.palette)
@@ -110,5 +100,31 @@ private struct ImagePickerCell: View {
         }
         .buttonStyle(.plain)
         .animation(.easeOut(duration: 0.1), value: isSelected)
+        .task(id: urlString) { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        isLoading   = true
+        loadedImage = nil
+        guard let url = URL(string: urlString),
+              let image = await ImageStore.thumbnail(for: url, maxPixelSize: 400)
+        else { fail(); return }
+
+        // Reject images that are too small to look sharp on a Retina display.
+        // A 120pt cell at 2× scale needs 240 source pixels in at least one dimension;
+        // below that the image would be upscaled and appear blurry.
+        // Thumbnails are never upscaled, so the thumbnail's size reflects the original here.
+        guard max(image.size.width, image.size.height) >= 240 else { fail(); return }
+
+        loadedImage = image
+        isLoading   = false
+    }
+
+    private func fail() {
+        isLoading = false
+        guard !hasFailed else { return }
+        hasFailed = true
+        onFail()
     }
 }

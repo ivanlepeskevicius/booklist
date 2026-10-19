@@ -40,6 +40,10 @@ final class Bookmark {
 
     /// Sort proxy for the Tags column — first tag name alphabetically, empty string for untagged items.
     var tagSortKey: String { tags.min { $0.name < $1.name }?.name ?? "" }
+
+    /// False once the bookmark has been deleted. Views holding on to a bookmark (e.g. the
+    /// reader panel) must check this — reading a deleted model's properties can crash.
+    var isAlive: Bool { !isDeleted && modelContext != nil }
     var isPinned: Bool
     var isRead: Bool
 

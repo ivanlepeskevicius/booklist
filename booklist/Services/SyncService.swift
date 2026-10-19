@@ -73,8 +73,8 @@ struct SyncService {
     /// Writes a full JSON snapshot to the sync folder. Updates `lastSyncDate`.
     static func export(context: ModelContext) throws {
         guard let folderURL = resolveBookmark() else { throw SyncError.noSyncFolder }
-        guard folderURL.startAccessingSecurityScopedResource() else { throw SyncError.noAccess }
-        defer { folderURL.stopAccessingSecurityScopedResource() }
+        let secured = folderURL.startAccessingSecurityScopedResource()
+        defer { if secured { folderURL.stopAccessingSecurityScopedResource() } }
 
         let syncData = try buildSnapshot(context: context)
         let encoder  = JSONEncoder()
@@ -93,8 +93,8 @@ struct SyncService {
     @discardableResult
     static func importIfNewer(context: ModelContext) throws -> Bool {
         guard let folderURL = resolveBookmark() else { return false }
-        guard folderURL.startAccessingSecurityScopedResource() else { throw SyncError.noAccess }
-        defer { folderURL.stopAccessingSecurityScopedResource() }
+        let secured = folderURL.startAccessingSecurityScopedResource()
+        defer { if secured { folderURL.stopAccessingSecurityScopedResource() } }
 
         let fileURL = folderURL.appendingPathComponent(syncFileName)
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
@@ -214,24 +214,27 @@ struct SyncService {
     // MARK: - Security-scoped bookmark helpers
 
     private static func saveBookmark(for url: URL) throws {
-        let data = try url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        )
+        // Prefer security-scoped bookmark (sandboxed); fall back to basic (non-sandboxed).
+        let data: Data
+        if let secureData = try? url.bookmarkData(options: .withSecurityScope,
+                                                   includingResourceValuesForKeys: nil,
+                                                   relativeTo: nil) {
+            data = secureData
+        } else {
+            data = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
         UserDefaults.standard.set(data, forKey: bookmarkDataKey)
     }
 
     private static func resolveBookmark() -> URL? {
         guard let data = UserDefaults.standard.data(forKey: bookmarkDataKey) else { return nil }
         var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: data,
-            options: .withSecurityScope,
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        ) else { return nil }
-        if isStale { try? saveBookmark(for: url) }
+        // Try security-scoped first (sandboxed builds), then plain bookmark (non-sandboxed).
+        let url = (try? URL(resolvingBookmarkData: data, options: .withSecurityScope,
+                            relativeTo: nil, bookmarkDataIsStale: &isStale))
+               ?? (try? URL(resolvingBookmarkData: data, options: [],
+                            relativeTo: nil, bookmarkDataIsStale: &isStale))
+        if let url, isStale { try? saveBookmark(for: url) }
         return url
     }
 
@@ -239,14 +242,11 @@ struct SyncService {
 
     enum SyncError: LocalizedError {
         case noSyncFolder
-        case noAccess
 
         var errorDescription: String? {
             switch self {
             case .noSyncFolder:
                 return "No sync folder configured. Choose one in Settings → Sync."
-            case .noAccess:
-                return "Can't access the sync folder. Try choosing it again in Settings → Sync."
             }
         }
     }

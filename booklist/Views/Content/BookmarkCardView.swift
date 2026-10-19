@@ -12,7 +12,8 @@ enum CardThumbnailStyle {
 struct BookmarkCardView: View {
     let bookmark: Bookmark
     let onOpen: () -> Void
-    let onDelete: () -> Void
+    /// Deletes the given bookmarks — just this card from the hover button, the whole selection from the context menu.
+    let onDelete: ([Bookmark]) -> Void
     let onManage: () -> Void
     /// Called when the user wants to open the reader view. nil = reader not available (wishlist items).
     var onRead: (() -> Void)? = nil
@@ -21,14 +22,23 @@ struct BookmarkCardView: View {
     var isSelected: Bool = false
     /// The full set of selected IDs — used to build the multi-item drag payload.
     var selectedIDs: Set<UUID> = []
-    /// Called on tap. Bool = was ⌘ held? (true → toggle, false → select only this).
-    var onSelect: (Bool) -> Void = { _ in }
+    /// Called on tap. First Bool = ⌘ held, second = ⇧ held.
+    var onSelect: (Bool, Bool) -> Void = { _, _ in }
     /// The bookmarks to export when "Share" is chosen from the context menu.
     /// If this card is part of a selection, callers pass all selected bookmarks.
     var shareBookmarks: [Bookmark] = []
+    /// Show the "not in a folder" dot. Only useful where filed and unfiled items are mixed (the All view).
+    var showsUnfiledDot: Bool = false
+    /// Offered in the context menu's "Move to Folder" / "Tags" submenus.
+    var folders: [Folder] = []
+    var tags: [Tag] = []
 
     @State private var isHovered         = false
-    @State private var showDeleteConfirm = false
+    @State private var thumbnailImage: NSImage?
+    /// Width ÷ height of the last loaded image. Kept after the image is released off-screen
+    /// so the card keeps its height and the masonry layout doesn't jump.
+    @State private var thumbnailAspect: CGFloat?
+    @State private var isOnScreen = false
 
     @AppStorage("showTitleOnCards")   private var showTitleOnCards   = true
     @AppStorage("showDateOnCards")    private var showDateOnCards    = true
@@ -74,7 +84,7 @@ struct BookmarkCardView: View {
             thumbnail
                 .overlay(alignment: .topLeading) {
                     if bookmark.itemType == .wishlistItem {
-                        Image(systemName: "tag.fill")
+                        Image(systemName: "cart.fill")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.white)
                             .padding(6)
@@ -117,21 +127,15 @@ struct BookmarkCardView: View {
             y: isHovered ? 4 : 2
         )
         // Status dot — mutually exclusive states share the same corner position:
-        //   Red    = uncategorised (needs to be filed)
+        //   Accent = uncategorised (needs to be filed) — only when showsUnfiledDot
         //   Yellow = categorised but not opened in staleDaysThreshold days
         .overlay(alignment: .topTrailing) {
             if bookmark.collection == nil {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 9, height: 9)
-                    .overlay { Circle().stroke(.background, lineWidth: 2) }
-                    .padding(6)
+                if showsUnfiledDot {
+                    statusDot(.accentColor, help: "Not in a folder yet")
+                }
             } else if isStale {
-                Circle()
-                    .fill(.yellow)
-                    .frame(width: 9, height: 9)
-                    .overlay { Circle().stroke(.background, lineWidth: 2) }
-                    .padding(6)
+                statusDot(.yellow, help: "Not opened in over \(staleDaysThreshold) days")
             }
         }
         .overlay(alignment: .top) {
@@ -141,21 +145,22 @@ struct BookmarkCardView: View {
         .animation(.easeOut(duration: 0.12), value: isHovered)
         // Tap selects the card; buttons in the hover overlay consume their own taps.
         .onTapGesture {
-            let cmdHeld = NSApp.currentEvent?.modifierFlags.contains(.command) ?? false
-            onSelect(cmdHeld)
+            let flags     = NSApp.currentEvent?.modifierFlags ?? []
+            let cmdHeld   = flags.contains(.command)
+            let shiftHeld = flags.contains(.shift)
+            onSelect(cmdHeld, shiftHeld)
         }
         .contextMenu { cardContextMenu }
         .draggable(dragPayload)
-        .confirmationDialog(
-            "Delete \"\(bookmark.title)\"?",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive, action: onDelete)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This cannot be undone.")
-        }
+    }
+
+    private func statusDot(_ color: Color, help: String) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 9, height: 9)
+            .overlay { Circle().stroke(.background, lineWidth: 2) }
+            .padding(6)
+            .help(help)
     }
 
     // MARK: - Context menu
@@ -169,6 +174,7 @@ struct BookmarkCardView: View {
         Divider()
         Button("Edit") { onManage() }
         let targets = shareBookmarks.isEmpty ? [bookmark] : shareBookmarks
+        BookmarkOrganizeMenu(targets: targets, folders: folders, tags: tags)
         let shareTitle = targets.count == 1 ? targets[0].title : "\(targets.count) Items"
         ShareLink(
             item: BookmarksExport(bookmarks: targets, title: shareTitle),
@@ -178,45 +184,60 @@ struct BookmarkCardView: View {
                   systemImage: "square.and.arrow.up")
         }
         Divider()
-        Button("Delete", role: .destructive) { showDeleteConfirm = true }
+        Button(targets.count == 1 ? "Delete" : "Delete \(targets.count) Items", role: .destructive) {
+            onDelete(targets)
+        }
     }
 
     // MARK: - Thumbnail
 
     @ViewBuilder
     private var thumbnail: some View {
-        if let urlString = bookmark.selectedImageURL,
-           let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    switch thumbnailStyle {
-                    case .fill:
-                        // Fixed height only — width comes from the parent (grid cell /
-                        // LazyVStack column). Avoid maxWidth:.infinity inside the closure:
-                        // AsyncImage does not reliably propagate the parent's width proposal
-                        // into its phase closure, causing the image to resolve to an
-                        // unbounded width and overflow the card at narrow column widths.
-                        image.resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 160)
-                            .clipped()
-                    case .fit:
-                        image.resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity, maxHeight: 500)
-                            .clipped()
-                    }
-                default:
-                    placeholderImage
+        Group {
+            if let image = thumbnailImage {
+                switch thumbnailStyle {
+                case .fill:
+                    Image(nsImage: image).resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 160)
+                        .clipped()
+                case .fit:
+                    Image(nsImage: image).resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: 500)
+                        .clipped()
                 }
+            } else if bookmark.selectedImageURL != nil, let aspect = thumbnailAspect {
+                // Image released while off-screen — hold its exact size.
+                Rectangle().fill(.quaternary)
+                    .aspectRatio(aspect, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: thumbnailStyle == .fill ? 160 : 500)
+            } else {
+                placeholderImage
             }
-            // Hard cap on the wrapper itself: second defensive layer in case the
-            // inner frame is bypassed before layout settles.
-            .frame(maxWidth: .infinity, maxHeight: thumbnailStyle == .fill ? 160 : 500)
-            .clipped()
-        } else {
-            placeholderImage
+        }
+        // Hard cap so a wide image can never overflow the card at narrow column widths.
+        .frame(maxWidth: .infinity, maxHeight: thumbnailStyle == .fill ? 160 : 500)
+        .clipped()
+        .onScrollVisibilityChange(threshold: 0.01) { isOnScreen = $0 }
+        // nil while off-screen, which releases the decoded image; masonry builds every card
+        // up front, so without this memory would grow with the size of the library.
+        .task(id: isOnScreen ? bookmark.selectedImageURL : nil) { await loadThumbnail() }
+    }
+
+    /// Loads the card image downsampled to card size (cached), instead of decoding it at full resolution.
+    private func loadThumbnail() async {
+        guard isOnScreen,
+              let urlString = bookmark.selectedImageURL,
+              let url = URL(string: urlString) else {
+            thumbnailImage = nil
+            return
+        }
+        let image = await ImageStore.thumbnail(for: url, maxPixelSize: 800)
+        guard !Task.isCancelled else { return }
+        thumbnailImage = image
+        if let image, image.size.height > 0 {
+            thumbnailAspect = image.size.width / image.size.height
         }
     }
 
@@ -246,8 +267,15 @@ struct BookmarkCardView: View {
 
     // MARK: - Card body
 
+    /// Wishlist cards stay minimal (image + price + title) — notes are hidden to reduce clutter (W5).
+    private var visibleNote: String? {
+        guard bookmark.itemType == .bookmark,
+              let note = bookmark.note, !note.isEmpty else { return nil }
+        return note
+    }
+
     private var hasCardBody: Bool {
-        showTitleOnCards || bookmark.note != nil || showDateOnCards
+        showTitleOnCards || visibleNote != nil || showDateOnCards
     }
 
     private var cardBody: some View {
@@ -259,14 +287,12 @@ struct BookmarkCardView: View {
                     .lineLimit(2)
             }
 
-            if let note = bookmark.note, !note.isEmpty {
+            if let note = visibleNote {
                 Text(note)
                     .font(resolvedFont(size: cardNoteSize))
                     .foregroundStyle(.secondary)
                     .lineLimit(5)
             }
-
-            Spacer(minLength: 0)
 
             if showDateOnCards {
                 Text(bookmark.dateAdded.formatted(date: .abbreviated, time: .omitted))
@@ -286,7 +312,7 @@ struct BookmarkCardView: View {
             }
             actionButton("arrow.up.right.square", "Open",   action: onOpen)
             actionButton("slider.horizontal.3",   "Edit",   action: onManage)
-            actionButton("trash",                 "Delete", color: .red) { showDeleteConfirm = true }
+            actionButton("trash",                 "Delete (⌘Z to undo)", color: .red) { onDelete([bookmark]) }
         }
         .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))

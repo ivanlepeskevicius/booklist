@@ -175,3 +175,6 @@ These are not features — they are constraints that apply to every decision:
 | P4 | ✅ | `NSStatusItem` menu bar icon with Open/Settings/Quit menu |
 | P6 | ✅ | Export to rich HTML with embedded JSON (`__BOOKLIST_DATA__`) for lossless re-import |
 | P7 | ✅ | Import from Netscape HTML (browser bookmarks) + booklist HTML round-trip |
+| W5 | ✅ | Wishlist cards hide notes (still visible in List view and the edit panel) |
+| V3 | ✅ | View mode remembered per sidebar item (`ViewModeMemory` in UserDefaults; local, not synced). Sort + card size stay global |
+| C1 | ✅ | System-wide hotkey via `KeyboardShortcuts` package (default ⌃⌥⌘B, user-recordable in Settings › General); also "Save Link…" in menu bar + File menu |

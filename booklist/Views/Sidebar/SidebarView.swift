@@ -215,17 +215,17 @@ struct SidebarView: View {
         deleteSubtree(folderID: folder.id)
     }
 
-    private func deleteSubtree(folderID: UUID) {
+    private func deleteSubtree(folderID: UUID, seen: Set<UUID> = []) {
+        guard !seen.contains(folderID) else { return }
+        let nextSeen = seen.union([folderID])
         let directChildren = allFolders.filter { $0.parent?.id == folderID }
-        for child in directChildren { deleteSubtree(folderID: child.id) }
+        for child in directChildren { deleteSubtree(folderID: child.id, seen: nextSeen) }
         if let target = allFolders.first(where: { $0.id == folderID }) {
             modelContext.delete(target)
         }
     }
 
     private func subtreeContains(id: UUID, parentID: UUID) -> Bool {
-        if parentID == id { return true }
-        let directChildren = allFolders.filter { $0.parent?.id == parentID }
-        return directChildren.contains { subtreeContains(id: id, parentID: $0.id) }
+        FolderTree.contains(targetID: id, in: parentID, folders: allFolders)
     }
 }

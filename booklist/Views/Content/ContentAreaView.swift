@@ -9,13 +9,16 @@ struct ContentAreaView: View {
     @Query(sort: \Tag.name) private var allTags: [Tag]
 
     @Environment(CaptureRouter.self) private var captureRouter
+    @Environment(\.modelContext) private var modelContext
 
     @State private var showingCapture = false
     @State private var showingImport  = false
 
     @State private var searchText          = ""
-    @State private var sortOption          = SortOption.recent
-    @State private var viewMode            = ViewMode.masonry
+    @AppStorage("sortOption") private var sortOption = SortOption.recent
+    /// The live view mode (also driven by the View menu); per-item choices are kept in viewModeMemoryData.
+    @AppStorage("viewMode")   private var viewMode   = ViewMode.masonry
+    @AppStorage("viewModeBySelection") private var viewModeMemoryData = Data()
     @State private var managingBookmark: Bookmark?
     @State private var readerBookmark: Bookmark?
     @State private var selectedBookmarkIDs: Set<UUID> = []
@@ -29,6 +32,7 @@ struct ContentAreaView: View {
     @AppStorage("showDateOnCards")     private var showDateOnCards  = true
     @AppStorage("readerPanelWidth")    private var readerWidth: Double = 460
     @AppStorage("captureShortcutKey")  private var captureShortcutKey = "t"
+    @AppStorage("cardSizeScale")       private var cardSizeScale = 1.0
 
     // MARK: - Derived data
 
@@ -41,41 +45,52 @@ struct ContentAreaView: View {
         }
     }
 
-    private var displayedBookmarks: [Bookmark] {
-        // 1. Filter by sidebar selection
-        var result: [Bookmark]
+    private var isFiltering: Bool { !searchText.isEmpty || !selectedTagIDs.isEmpty }
+
+    /// Bookmarks belonging to the current sidebar selection, before search/tag filtering.
+    private var scopedBookmarks: [Bookmark] {
         switch selection {
         case .inbox:
             // Only regular bookmarks with no folder
-            result = allBookmarks.filter { $0.collection == nil && $0.itemType == .bookmark }
+            return allBookmarks.filter { $0.collection == nil && $0.itemType == .bookmark }
         case .wishlist:
             // Only unclassified wishlist items — mirrors Inbox behaviour
-            result = allBookmarks.filter { $0.collection == nil && $0.itemType == .wishlistItem }
+            return allBookmarks.filter { $0.collection == nil && $0.itemType == .wishlistItem }
         case .all:
-            result = allBookmarks
+            return allBookmarks
         case .folder(let id):
             let ids = subtreeFolderIDs(rootID: id)
-            result = allBookmarks.filter { bm in
+            return allBookmarks.filter { bm in
                 guard let cid = bm.collection?.id else { return false }
                 return ids.contains(cid)
             }
         }
+    }
 
-        // 2. Filter by selected tags (OR logic — show bookmarks that have any selected tag)
+    private var displayedBookmarks: [Bookmark] {
+        filteredAndSorted(scopedBookmarks)
+    }
+
+    private func filteredAndSorted(_ scoped: [Bookmark]) -> [Bookmark] {
+        var result = scoped
+
+        // Filter by selected tags (OR logic — show bookmarks that have any selected tag)
         if !selectedTagIDs.isEmpty {
             result = result.filter { bm in
                 bm.tags.contains { selectedTagIDs.contains($0.id) }
             }
         }
 
-        // 3. Filter by search text
+        // Filter by search text. Tags are shown as "#name", so a leading "#" is ignored for tag matching.
         if !searchText.isEmpty {
             let q = searchText.lowercased()
+            let tagQuery = q.hasPrefix("#") ? String(q.dropFirst()) : q
             result = result.filter {
                 $0.title.lowercased().contains(q) ||
                 ($0.note?.lowercased().contains(q) == true) ||
                 ($0.pageDescription?.lowercased().contains(q) == true) ||
-                $0.url.lowercased().contains(q)
+                $0.url.lowercased().contains(q) ||
+                (!tagQuery.isEmpty && $0.tags.contains { $0.name.lowercased().contains(tagQuery) })
             }
         }
 
@@ -110,20 +125,27 @@ struct ContentAreaView: View {
     // MARK: - Body
 
     var body: some View {
+        // Filtering + sorting is computed once per render and shared below,
+        // rather than re-running for every place that needs the list.
+        let scoped = scopedBookmarks
+        let bookmarks = filteredAndSorted(scoped)
+        // Only offer tags that exist in this view (plus any still selected), so no chip leads nowhere.
+        let scopedTagIDs = Set(scoped.flatMap { $0.tags.map(\.id) })
+        let visibleTags = allTags.filter { scopedTagIDs.contains($0.id) || selectedTagIDs.contains($0.id) }
+
         HStack(spacing: 0) {
             // Main content area
             VStack(spacing: 0) {
-                toolbar
-                Divider()
-                if !allTags.isEmpty {
-                    tagFilterBar
+                if !visibleTags.isEmpty {
+                    tagFilterBar(tags: visibleTags)
                     Divider()
                 }
-                content
+                content(for: bookmarks)
             }
 
-            // Inline reader panel — slides in from the right, width is user-adjustable
-            if let bookmark = readerBookmark {
+            // Inline reader panel — slides in from the right, width is user-adjustable.
+            // isAlive guards the render between a delete and the onChange below clearing it.
+            if let bookmark = readerBookmark, bookmark.isAlive {
                 HStack(spacing: 0) {
                     ReaderDragHandle(width: $readerWidth)
                     ReaderView(bookmark: bookmark, onClose: { readerBookmark = nil })
@@ -134,21 +156,31 @@ struct ContentAreaView: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: readerBookmark != nil)
+        .background { keyboardShortcuts(for: bookmarks) }
         .navigationTitle(navigationTitle)
+        .searchable(text: $searchText, prompt: "Search \(navigationTitle)")
+        .searchFocused($isSearchFocused)
+        // Lets File › Import Bookmarks… open the import sheet in this window.
+        .focusedSceneValue(\.showingImport, $showingImport)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button { showingImport = true } label: {
-                    Image(systemName: "square.and.arrow.down")
+                Picker("View", selection: $viewMode) {
+                    ForEach(ViewMode.allCases, id: \.self) { mode in
+                        Label(mode.rawValue, systemImage: mode.iconName).tag(mode)
+                    }
                 }
-                .help("Import bookmarks")
+                .pickerStyle(.segmented)
+                .help("View as Masonry (⌘1) or List (⌘2)")
 
-                if !displayedBookmarks.isEmpty {
+                viewOptionsMenu
+
+                if !bookmarks.isEmpty {
                     let shareTargets = selectedBookmarkIDs.isEmpty
-                        ? displayedBookmarks
-                        : displayedBookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+                        ? bookmarks
+                        : bookmarks.filter { selectedBookmarkIDs.contains($0.id) }
                     let shareTitle: String = {
                         if selectedBookmarkIDs.count == 1,
-                           let bm = displayedBookmarks.first(where: { selectedBookmarkIDs.contains($0.id) }) {
+                           let bm = bookmarks.first(where: { selectedBookmarkIDs.contains($0.id) }) {
                             return bm.title
                         } else if selectedBookmarkIDs.count > 1 {
                             return "\(selectedBookmarkIDs.count) Items"
@@ -174,11 +206,6 @@ struct ContentAreaView: View {
                 .help(captureShortcutKey == "none"
                       ? "Save a new link"
                       : "Save a new link (⌘\(captureShortcutKey.uppercased()))")
-
-                SettingsLink {
-                    Image(systemName: "gear")
-                }
-                .help("Settings (⌘,)")
             }
         }
         .sheet(item: $managingBookmark) { bookmark in
@@ -200,7 +227,20 @@ struct ContentAreaView: View {
         .onChange(of: selection) {
             selectedBookmarkIDs = []
             selectedTagIDs = []
+            searchText = ""
             readerBookmark = nil
+        }
+        // Per-item view mode: restore on navigation (items never set keep the current mode),
+        // remember whenever it changes — from the toolbar or the View menu.
+        .onChange(of: selection, initial: true) {
+            if let saved = ViewModeMemory(data: viewModeMemoryData).mode(for: selection) {
+                viewMode = saved
+            }
+        }
+        .onChange(of: viewMode) {
+            var memory = ViewModeMemory(data: viewModeMemoryData)
+            memory.remember(viewMode, for: selection)
+            viewModeMemoryData = memory.data
         }
         // When reader is open and the user single-selects a different card, switch to it.
         .onChange(of: selectedBookmarkIDs) { _, newIDs in
@@ -211,37 +251,70 @@ struct ContentAreaView: View {
             readerBookmark = bm
         }
         // Auto-open capture when a URL arrives from the Share Extension / deep link.
-        .onChange(of: captureRouter.pendingURL) { _, newURL in
+        // `initial: true` catches requests made before this view existed (window was closed).
+        .onChange(of: captureRouter.pendingURL, initial: true) { _, newURL in
             if newURL != nil { showingCapture = true }
         }
+        // Close the reader if its bookmark was deleted by any path (hover trash, context menu,
+        // ⌘⌫, sync restore…). Compares persistentModelID, which is safe on deleted models.
+        .onChange(of: allBookmarks.map(\.persistentModelID)) { _, liveIDs in
+            if let reader = readerBookmark,
+               !reader.isAlive || !liveIDs.contains(reader.persistentModelID) {
+                readerBookmark = nil
+            }
+        }
+        // Menu bar / File menu "Save Link…"
+        .onChange(of: captureRouter.isCaptureRequested, initial: true) { _, requested in
+            guard requested else { return }
+            captureRouter.isCaptureRequested = false
+            showingCapture = true
+        }
+    }
+
+    // MARK: - Keyboard shortcuts
+
+    /// Invisible buttons that exist only to carry key equivalents for the main window.
+    /// Shortcuts that would clash with typing are disabled while the search field is focused.
+    private func keyboardShortcuts(for bookmarks: [Bookmark]) -> some View {
+        let selected = bookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+        return Group {
+            Button("Search") { isSearchFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+
+            Button("Open Selected") { BookmarkBulkActions.open(selected) }
+                .keyboardShortcut("o", modifiers: .command)
+                .disabled(selected.isEmpty)
+
+            Button("Delete Selected") {
+                if let reader = readerBookmark, selected.contains(where: { $0.id == reader.id }) {
+                    readerBookmark = nil
+                }
+                selectedBookmarkIDs = []
+                BookmarkBulkActions.delete(selected, from: modelContext)
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(selected.isEmpty || isSearchFocused)
+
+            // Esc steps back: close the reader first, then clear the selection.
+            Button("Dismiss") {
+                if readerBookmark != nil { readerBookmark = nil }
+                else { selectedBookmarkIDs = [] }
+            }
+            .keyboardShortcut(.escape, modifiers: [])
+            .disabled(isSearchFocused || (readerBookmark == nil && selectedBookmarkIDs.isEmpty))
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: - Toolbar
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            // Search bar
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                TextField("Search in \(navigationTitle)…", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .focused($isSearchFocused)
-                if !searchText.isEmpty {
-                    Button { searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(8)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            .focusRing(when: isSearchFocused)
-
-            // Sort picker
-            Menu {
+    /// Sort order + card size in one toolbar menu (card size also lives in the View menu).
+    private var viewOptionsMenu: some View {
+        Menu {
+            Section("Sort By") {
                 ForEach(SortOption.allCases, id: \.self) { option in
                     Button {
                         sortOption = option
@@ -255,46 +328,48 @@ struct ContentAreaView: View {
                         }
                     }
                 }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            // View mode toggle
-            Picker("View", selection: $viewMode) {
-                ForEach(ViewMode.allCases, id: \.self) { mode in
-                    Image(systemName: mode.iconName).tag(mode)
+            if viewMode == .masonry {
+                Section("Card Size") {
+                    ForEach(CardSize.allCases, id: \.self) { size in
+                        Button {
+                            cardSizeScale = size.scale
+                        } label: {
+                            if CardSize.matching(cardSizeScale) == size {
+                                Label(size.label, systemImage: "checkmark")
+                            } else {
+                                Text(size.label)
+                            }
+                        }
+                    }
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 68)
+        } label: {
+            Label("View Options", systemImage: "arrow.up.arrow.down")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .help("Sort and card size")
     }
 
     // MARK: - Content area
 
     @ViewBuilder
-    private var content: some View {
-        if displayedBookmarks.isEmpty {
+    private func content(for bookmarks: [Bookmark]) -> some View {
+        if bookmarks.isEmpty {
             emptyState
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             switch viewMode {
             case .masonry:
                 MasonryView(
-                    bookmarks: displayedBookmarks,
+                    bookmarks: bookmarks,
                     onManage: { managingBookmark = $0 },
                     onRead:   { readerBookmark   = $0 },
-                    selectedIDs: $selectedBookmarkIDs
+                    selectedIDs: $selectedBookmarkIDs,
+                    showsUnfiledDot: selection == .all
                 )
             case .list:
                 BookmarkListView(
-                    bookmarks: displayedBookmarks,
+                    bookmarks: bookmarks,
                     onManage: { managingBookmark = $0 },
                     onRead:   { readerBookmark   = $0 },
                     selectedIDs: $selectedBookmarkIDs,
@@ -309,10 +384,10 @@ struct ContentAreaView: View {
 
     // MARK: - Tag filter bar
 
-    private var tagFilterBar: some View {
+    private func tagFilterBar(tags: [Tag]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(allTags) { tag in
+                ForEach(tags) { tag in
                     let isSelected = selectedTagIDs.contains(tag.id)
                     Button {
                         if isSelected { selectedTagIDs.remove(tag.id) }
@@ -342,27 +417,48 @@ struct ContentAreaView: View {
     // MARK: - Folder subtree
 
     private func subtreeFolderIDs(rootID: UUID) -> Set<UUID> {
-        var result: Set<UUID> = [rootID]
-        for child in allFolders where child.parent?.id == rootID {
-            result.formUnion(subtreeFolderIDs(rootID: child.id))
-        }
-        return result
+        FolderTree.subtreeIDs(rootID: rootID, in: allFolders)
     }
 
+    @ViewBuilder
     private var emptyState: some View {
-        let isWishlist = selection == .wishlist
-        return ContentUnavailableView(
-            searchText.isEmpty ? "Nothing here yet" : "No results",
-            systemImage: searchText.isEmpty
-                ? (isWishlist ? "cart" : "bookmark")
-                : "magnifyingglass",
-            description: Text(
-                searchText.isEmpty
-                ? (isWishlist ? "Save your first wishlist item to get started." : "Save your first link to get started.")
-                : "Try a different search term."
+        if isFiltering {
+            ContentUnavailableView {
+                Label("No results", systemImage: "magnifyingglass")
+            } description: {
+                Text("Nothing matches your search or tag filter.")
+            } actions: {
+                Button("Clear Filters") {
+                    searchText = ""
+                    selectedTagIDs = []
+                }
+            }
+        } else if selection == .inbox && !allBookmarks.isEmpty {
+            // An empty Inbox in a non-empty library is an achievement, not a blank state.
+            ContentUnavailableView(
+                "All caught up",
+                systemImage: "checkmark.circle",
+                description: Text("Everything in your Inbox has been filed.")
             )
-        )
+        } else {
+            let isWishlist = selection == .wishlist
+            ContentUnavailableView(
+                "Nothing here yet",
+                systemImage: isWishlist ? "cart" : "bookmark",
+                description: Text(isWishlist
+                    ? "Save your first wishlist item to get started."
+                    : "Save your first link to get started.")
+            )
+        }
     }
+}
+
+// MARK: - Focused values
+
+extension FocusedValues {
+    /// The focused window's "import sheet shown" state — published by ContentAreaView,
+    /// set by File › Import Bookmarks…
+    @Entry var showingImport: Binding<Bool>?
 }
 
 // MARK: - Capture shortcut helper

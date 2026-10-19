@@ -9,7 +9,10 @@ actor ReaderService {
 
     /// Cache of cleaned (noise-stripped) HTML keyed by URL string.
     /// Re-rendering with different font settings uses this cache instead of the network.
+    /// Capped at `maxCachedPages` (oldest evicted first) so it can't grow for the whole session.
     private var cleanedCache: [String: String] = [:]
+    private var cacheOrder: [String] = []
+    private let maxCachedPages = 10
 
     // MARK: - Public API
 
@@ -43,6 +46,10 @@ actor ReaderService {
         content = stripNoiseTags(content)
         content = collapseBlankLines(content)
         cleanedCache[urlString] = content
+        cacheOrder.append(urlString)
+        if cacheOrder.count > maxCachedPages {
+            cleanedCache[cacheOrder.removeFirst()] = nil
+        }
         return content
     }
 

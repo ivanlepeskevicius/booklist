@@ -8,13 +8,22 @@ struct FolderRowView: View {
     let folder: Folder
     let allFolders: [Folder]
     @Binding var selection: SidebarSelection?
+    /// IDs already rendered by ancestor rows — stops infinite recursion if data is circular.
+    private let seenIDs: Set<UUID>
+
+    init(folder: Folder, allFolders: [Folder], selection: Binding<SidebarSelection?>, seenIDs: Set<UUID> = []) {
+        self.folder = folder
+        self.allFolders = allFolders
+        self._selection = selection
+        self.seenIDs = seenIDs.union([folder.id])
+    }
 
     @Environment(\.modelContext) private var modelContext
     @State private var isBookmarkDropTargeted = false
 
     private var children: [Folder] {
         allFolders
-            .filter { $0.parent?.id == folder.id }
+            .filter { $0.parent?.id == folder.id && !seenIDs.contains($0.id) }
             .sorted { $0.sortOrder < $1.sortOrder }
     }
 
@@ -51,7 +60,7 @@ struct FolderRowView: View {
         } else {
             DisclosureGroup {
                 ForEach(children) { child in
-                    FolderRowView(folder: child, allFolders: allFolders, selection: $selection)
+                    FolderRowView(folder: child, allFolders: allFolders, selection: $selection, seenIDs: seenIDs)
                 }
                 .onMove { indices, destination in
                     reorderFolders(indices: indices, destination: destination, among: children)

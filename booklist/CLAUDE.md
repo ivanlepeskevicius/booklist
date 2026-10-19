@@ -147,3 +147,22 @@ Core app is functional. All foundation phases are complete.
 | 2026-04-28 | Folder-based JSON sync (security-scoped bookmark) instead of iCloud   | iCloud/CloudKit requires paid developer account ($99/yr); free alternative |
 | 2026-04-28 | `BookmarksExport: Transferable` with eager snapshot of SwiftData models | Required to avoid SwiftData thread-safety issues in `ShareLink` |
 | 2026-04-28 | All bookmark filtering done in-memory (no SwiftData predicates)        | Personal-scale data; avoids predicate complexity              |
+| 2026-10-19 | Card/picker images loaded via `ImageStore.thumbnail` (ImageIO downsampling + NSCache), not `AsyncImage` | Full-resolution decoding of every card used hundreds of MB |
+| 2026-10-19 | Cards release decoded images when scrolled off-screen (`onScrollVisibilityChange`), keeping aspect ratio | Masonry isn't lazy; memory must not scale with library size |
+| 2026-10-19 | Saved images capped at 1600px, written via `CGImageDestination` (no `tiffRepresentation`) | Avoids huge uncompressed copies on save |
+| 2026-10-19 | `MetadataFetcher` is `nonisolated` + `@concurrent` | Project defaults to MainActor; HTML regex parsing froze the UI during capture |
+| 2026-10-19 | Undo (⌘Z) instead of delete confirmations; window `undoManager` bound to `mainContext` in `ContentView` | Confirmations on every delete add friction; app passes its own container so `isUndoEnabled:` modifier isn't available |
+| 2026-10-19 | `BookmarkBulkActions` + `BookmarkOrganizeMenu` shared by card and list context menus | Bulk move/tag/delete for Inbox triage; one implementation keeps both view modes identical |
+| 2026-10-19 | Wishlist sidebar item stays an "unfiled wishlist inbox" (collection == nil) | Ivan's decision — revisit later |
+| 2026-10-19 | "Unfiled" dot only shown in All view, accent colour, with tooltips | Red dot on every Inbox/Wishlist card was redundant and anxiety-inducing |
+| 2026-10-19 | File › New Window replaced by File › Save Link… | AppDelegate tracks a single main window; extra windows broke menu-bar show/hide |
+| 2026-10-19 | `KeyboardShortcuts` SPM package (sindresorhus) for the global capture hotkey — first third-party dependency | User-recordable shortcut; works in the sandbox without Accessibility permission. Carbon API alternative rejected (more code, presets only) |
+| 2026-10-19 | `AppDelegate.bringUpMainWindow` + `openMainWindow` hook (set by MenuBarIcon / menu items) | `openWindow` is view-only; lets the hotkey recreate a window closed in dock mode |
+| 2026-10-19 | Single native toolbar: `.searchable` search field, view picker, View Options menu (sort + card size), share, +. Import → File menu (⇧⌘I); gear removed | One bar instead of two; native search; more room for cards. `.searchable` logs a one-time AppKit "layoutSubtreeIfNeeded" WarnOnce at launch — framework-internal, verified by bisecting |
+| 2026-10-19 | Card size as named presets (`CardSize`: Small/Medium/Large/Extra Large) in toolbar menu + View menu (⌘= / ⌘−); slider stays in Settings | The slider already snapped to 5 column counts; names are clearer. "=" not "+" because "+" needs Shift |
+| 2026-10-19 | Per-item view mode stored as a UserDefaults map (`ViewModeMemory`, keyed by `SidebarSelection.storageKey`) rather than a `Folder` field | No schema/sync change; also covers Inbox/Wishlist/All. Trade-off: local to each Mac |
+| 2026-10-19 | `ImageStore` rejects non-2xx responses before decoding and remembers failed remote URLs for the session | A dead image link (404 HTML page) was re-downloaded every time its card scrolled on screen, logging ImageIO decode errors |
+| 2026-10-19 | Plain value types used by tests (`SidebarSelection`, `ViewMode`, `CardSize`, `ViewModeMemory`) are `nonisolated` | Target defaults to MainActor; otherwise their Equatable conformances are main-actor-only (Swift 6 error in tests) |
+| 2026-10-19 | Capture "Save" bound to ⌘Return (was Return) | Plain Return must insert a newline in the multi-line note field |
+| 2026-10-19 | Reader panel guarded by `Bookmark.isAlive` + closes when its bookmark disappears from the query | Deleting the open bookmark via hover/context menu left the reader on a deleted model (crash risk) |
+| 2026-10-19 | Settings consolidated to 4 tabs: General (incl. currency), Display (cards + list columns), Tags, Sync | Fewer tabs = less hunting |

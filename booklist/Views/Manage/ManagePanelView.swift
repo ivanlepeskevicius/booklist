@@ -30,16 +30,16 @@ struct ManagePanelView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     detailsGroup
+                    locationGroup
                     tagsGroup
                         .zIndex(2)   // lets the tag dropdown float above the section below
-                    locationGroup
                     typeGroup
                     thumbnailGroup
                     infoGroup
                 }
                 .padding(20)
             }
-            .navigationTitle("Edit Bookmark")
+            .navigationTitle(bookmark.itemType == .wishlistItem ? "Edit Wishlist Item" : "Edit Bookmark")
             .navigationSubtitle(URL(string: bookmark.url)?.host ?? "")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -112,11 +112,11 @@ struct ManagePanelView: View {
                     Label("Inbox (no folder)", systemImage: "tray")
                 }
                 Divider()
-                ForEach(allFolders) { folder in
+                ForEach(FolderTree.flattened(allFolders), id: \.folder.id) { entry in
                     Button {
-                        bookmark.collection = folder
+                        bookmark.collection = entry.folder
                     } label: {
-                        Label(folderDisplayPath(folder), systemImage: folder.icon)
+                        Label(entry.path, systemImage: entry.folder.icon)
                     }
                 }
                 if !allFolders.isEmpty { Divider() }
@@ -264,17 +264,5 @@ struct ManagePanelView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
         }
-    }
-
-    // MARK: - Helpers
-
-    private func folderDisplayPath(_ folder: Folder) -> String {
-        var parts = [folder.name]
-        var current = folder
-        while let parent = current.parent {
-            parts.insert(parent.name, at: 0)
-            current = parent
-        }
-        return parts.joined(separator: " › ")
     }
 }

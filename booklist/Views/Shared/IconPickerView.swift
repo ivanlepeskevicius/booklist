@@ -51,146 +51,179 @@ struct IconPickerView: View {
     static let symbolsByCategory: [(String, [String])] = [
         ("Folders & Files", [
             "folder", "folder.fill", "folder.badge.plus", "folder.badge.minus",
-            "tray", "tray.fill", "tray.2", "tray.and.arrow.down",
+            "folder.badge.questionmark", "folder.badge.gearshape",
+            "tray", "tray.fill", "tray.2", "tray.full", "tray.full.fill",
+            "tray.and.arrow.down", "tray.and.arrow.up", "tray.and.arrow.up.fill",
             "archivebox", "archivebox.fill",
             "doc", "doc.fill", "doc.richtext", "doc.plaintext",
-            "doc.text", "doc.on.doc", "doc.badge.plus", "doc.text.magnifyingglass",
-            "paperclip", "link",
+            "doc.text", "doc.on.doc", "doc.badge.plus", "doc.badge.arrow.up",
+            "doc.on.clipboard", "doc.on.clipboard.fill", "doc.text.magnifyingglass",
+            "paperclip", "rectangle.and.paperclip", "link",
             "externaldrive", "externaldrive.fill", "internaldrive",
             "briefcase", "briefcase.fill",
             "square.and.arrow.down", "square.and.arrow.up",
             "shippingbox", "shippingbox.fill",
-            "filemenu.and.selection"
+            "filemenu.and.selection",
         ]),
         ("Lists & Notes", [
-            "list.bullet", "list.dash", "list.number",
+            "list.bullet", "list.dash", "list.number", "list.triangle",
+            "list.bullet.clipboard", "list.bullet.clipboard.fill",
             "checklist", "checklist.checked", "checklist.unchecked",
-            "note.text", "square.and.pencil",
-            "pencil", "pencil.and.outline", "highlighter", "signature",
+            "table", "table.fill",
+            "note", "note.text", "note.text.badge.plus", "square.and.pencil",
+            "pencil", "pencil.circle", "pencil.tip", "pencil.tip.crop.circle",
+            "pencil.and.outline", "highlighter", "signature",
             "text.alignleft", "text.aligncenter",
-            "bookmark", "bookmark.fill", "bookmark.circle",
-            "pin", "pin.fill",
-            "flag", "flag.fill", "flag.circle",
-            "tag", "tag.fill",
-            "calendar", "calendar.badge.plus",
-            "clock", "clock.fill", "timer", "alarm", "alarm.fill"
+            "line.3.horizontal", "line.3.horizontal.decrease",
+            "bookmark", "bookmark.fill", "bookmark.circle", "bookmark.slash",
+            "pin", "pin.fill", "pin.circle",
+            "flag", "flag.fill", "flag.circle", "flag.2.crossed", "flag.slash",
+            "tag", "tag.fill", "tag.circle", "tag.slash",
+            "calendar", "calendar.badge.plus", "calendar.badge.minus", "calendar.circle",
+            "clock", "clock.fill", "timer", "alarm", "alarm.fill",
         ]),
         ("Media & Creative", [
-            "photo", "photo.fill", "photo.on.rectangle", "photo.stack", "photo.artframe",
+            "photo", "photo.fill", "photo.on.rectangle", "photo.stack", "photo.artframe", "photo.badge.plus",
             "film", "film.fill",
-            "music.note", "music.note.list",
-            "headphones",
+            "music.note", "music.note.list", "music.quarternote.3", "music.note.tv",
+            "headphones", "headphones.circle",
+            "speaker", "speaker.fill", "speaker.wave.2",
             "waveform",
+            "radio", "radio.fill", "airplayaudio",
             "camera", "camera.fill", "camera.circle",
             "video", "video.fill",
-            "mic", "mic.fill",
+            "mic", "mic.fill", "mic.circle",
             "paintbrush", "paintbrush.fill", "paintbrush.pointed",
             "paintpalette", "paintpalette.fill",
             "scissors", "lasso",
-            "wand.and.stars", "wand.and.rays",
-            "eyedropper", "eyedropper.full", "crop"
+            "wand.and.stars", "wand.and.rays", "wand.and.sparkles",
+            "eyedropper", "eyedropper.full", "crop",
         ]),
         ("Shopping & Money", [
             "cart", "cart.fill", "cart.badge.plus",
-            "bag", "bag.fill",
+            "bag", "bag.fill", "bag.circle", "bag.badge.plus", "bag.badge.minus",
             "handbag", "handbag.fill",
             "backpack", "backpack.fill",
-            "gift", "gift.fill",
+            "gift", "gift.fill", "gift.circle",
             "giftcard", "giftcard.fill",
             "dollarsign", "dollarsign.circle", "dollarsign.circle.fill",
             "creditcard", "creditcard.fill",
             "eurosign", "sterlingsign", "yensign",
-            "banknote", "percent", "tag.slash",
-            "purchased", "purchased.circle"
+            "banknote", "banknote.fill", "percent", "tag.slash",
+            "purchased", "purchased.circle",
+            "chart.bar", "chart.bar.xaxis", "chart.line.uptrend.xyaxis",
+            "chart.pie", "chart.pie.fill",
         ]),
         ("Communication", [
             "envelope", "envelope.fill", "envelope.circle", "envelope.badge",
+            "envelope.open", "envelope.open.fill",
             "bubble.left", "bubble.left.fill",
             "bubble.right", "bubble.right.fill",
             "bubble.left.and.bubble.right",
-            "phone", "phone.fill", "phone.circle",
+            "bubble.middle.bottom", "bubble.middle.bottom.fill",
+            "message", "message.fill",
+            "phone", "phone.fill", "phone.circle", "phone.bubble", "phone.badge.plus",
             "globe", "wifi", "network",
-            "antenna.radiowaves.left.and.right",
+            "antenna.radiowaves.left.and.right", "dot.radiowaves.left.and.right",
             "at", "paperplane", "paperplane.fill",
             "megaphone", "megaphone.fill",
-            "shareplay", "quote.bubble"
+            "bell", "bell.fill", "bell.badge", "bell.and.waves.left.and.right",
+            "shareplay", "quote.bubble",
         ]),
         ("People & Social", [
             "person", "person.fill", "person.circle", "person.circle.fill",
             "person.badge.plus", "person.badge.minus",
-            "person.2", "person.2.fill",
+            "person.crop.circle", "person.crop.circle.badge.checkmark",
+            "person.2", "person.2.fill", "person.2.wave.2",
             "person.3", "person.3.fill",
-            "person.crop.circle",
-            "heart", "heart.fill", "heart.circle",
+            "figure.2",
+            "face.smiling", "face.smiling.fill",
+            "heart", "heart.fill", "heart.circle", "heart.circle.fill",
             "hand.thumbsup", "hand.thumbsup.fill",
             "hand.thumbsdown", "hand.thumbsdown.fill",
             "hand.wave", "hand.raised", "hands.clap",
-            "star", "star.fill", "rosette",
+            "hands.sparkles", "hands.sparkles.fill",
+            "star", "star.fill", "star.circle", "rosette",
             "brain", "brain.head.profile",
-            "figure.walk", "figure.run", "figure.stand"
+            "figure.walk", "figure.run", "figure.stand",
         ]),
         ("Technology", [
             "laptopcomputer", "desktopcomputer", "iphone", "ipad", "applewatch",
             "keyboard", "computermouse",
             "cpu", "memorychip", "server.rack",
-            "externaldrive", "internaldrive",
-            "terminal", "code", "chevron.left.forwardslash.chevron.right",
-            "wifi", "bluetooth", "network",
-            "gear", "gearshape", "gearshape.fill",
+            "externaldrive", "externaldrive.fill", "internaldrive",
+            "terminal", "curlybraces", "chevron.left.forwardslash.chevron.right",
+            "square.grid.2x2", "square.grid.3x3", "square.grid.4x3.fill",
+            "wifi", "dot.radiowaves.left.and.right", "network",
+            "gear", "gearshape", "gearshape.fill", "gearshape.2",
             "wrench.and.screwdriver", "wrench.and.screwdriver.fill",
             "hammer", "hammer.fill",
-            "chart.bar", "chart.line.uptrend.xyaxis",
-            "stethoscope", "printer", "tv", "tv.fill"
+            "puzzlepiece", "puzzlepiece.fill", "puzzlepiece.extension", "puzzlepiece.extension.fill",
+            "power", "power.circle", "power.circle.fill",
+            "stethoscope", "printer", "tv", "tv.fill",
         ]),
         ("Nature & Places", [
-            "leaf", "leaf.fill",
+            "leaf", "leaf.fill", "leaf.circle",
             "tree", "tree.fill",
             "flame", "flame.fill", "drop", "drop.fill",
-            "cloud", "cloud.fill", "cloud.rain", "cloud.bolt",
-            "sun.max", "sun.max.fill",
+            "cloud", "cloud.fill", "cloud.rain", "cloud.bolt", "cloud.sun",
+            "sun.max", "sun.max.fill", "sun.horizon", "sun.horizon.fill",
             "moon", "moon.fill", "moon.stars",
             "snowflake", "wind",
-            "globe.europe.africa", "globe.americas",
+            "globe.europe.africa", "globe.europe.africa.fill",
+            "globe.americas", "globe.americas.fill",
             "map", "map.fill",
             "building.2", "building.2.fill",
-            "building.columns", "house", "house.fill",
-            "mountain.2",
+            "building.columns", "building.columns.fill",
+            "house", "house.fill",
+            "mountain.2", "mountain.2.fill",
             "tortoise", "hare", "bird", "fish", "ant", "ladybug",
+            "dog", "dog.fill", "cat", "cat.fill", "lizard",
             "pawprint", "pawprint.fill",
-            "beach.umbrella"
+            "beach.umbrella",
         ]),
         ("Activities & Sports", [
             "book", "book.fill", "books.vertical", "books.vertical.fill",
             "graduationcap", "graduationcap.fill",
             "figure.run", "figure.walk", "figure.hiking",
             "figure.yoga", "figure.basketball",
-            "figure.surfing", "figure.swimming",
-            "bicycle", "sportscourt", "sportscourt.fill",
-            "trophy", "trophy.fill",
+            "figure.dance", "figure.american.football",
+            "figure.open.water.swim", "figure.pool.swim",
+            "figure.strengthtraining.traditional", "figure.mind.and.body",
+            "bicycle", "bicycle.circle", "bicycle.circle.fill",
+            "sportscourt", "sportscourt.fill",
+            "trophy", "trophy.fill", "medal", "medal.fill",
+            "dumbbell", "dumbbell.fill",
+            "soccerball", "baseball", "basketball", "tennis.racket",
             "gamecontroller", "gamecontroller.fill",
-            "puzzlepiece", "puzzlepiece.fill",
-            "guitar", "pianokeys", "music.mic",
+            "guitars", "pianokeys", "music.mic",
             "ticket", "ticket.fill",
-            "theatermasks", "theatermasks.fill"
+            "theatermasks", "theatermasks.fill",
         ]),
         ("Food & Drink", [
             "fork.knife", "fork.knife.circle",
             "cup.and.saucer", "cup.and.saucer.fill",
             "mug", "mug.fill",
-            "wineglass",
-            "birthday.cake",
+            "wineglass", "wineglass.fill",
+            "birthday.cake", "birthday.cake.fill",
             "carrot",
-            "cart", "bag"
+            "popcorn", "popcorn.fill",
+            "takeoutbag.and.cup.and.straw",
+            "cart", "bag",
         ]),
         ("Travel & Transport", [
             "airplane", "airplane.departure", "airplane.arrival",
-            "car.fill", "car.circle",
+            "car", "car.fill", "car.circle",
             "bus", "tram",
-            "figure.walk", "figure.hiking",
+            "ferry", "ferry.fill",
+            "bicycle", "bicycle.circle",
+            "fuelpump", "fuelpump.fill",
+            "parkingsign", "parkingsign.circle",
             "map", "map.fill",
             "location", "location.fill", "location.circle",
             "building.2.fill",
-            "signpost.right", "signpost.right.fill"
+            "signpost.right", "signpost.right.fill",
+            "figure.walk", "figure.hiking",
         ]),
         ("Symbols & UI", [
             "checkmark.circle", "checkmark.circle.fill",
@@ -204,12 +237,13 @@ struct IconPickerView: View {
             "magnifyingglass",
             "lock", "lock.fill", "lock.open",
             "eye", "eye.slash",
-            "bell", "bell.fill", "bell.badge",
             "lightbulb", "lightbulb.fill",
-            "sparkles", "infinity",
+            "sparkles", "sparkle", "wand.and.sparkles", "infinity",
             "shield", "shield.fill",
             "arrow.clockwise", "arrow.counterclockwise",
-            "power", "slider.horizontal.3"
+            "arrow.up", "arrow.down", "arrow.left", "arrow.right", "arrow.up.right",
+            "chevron.up", "chevron.down",
+            "power", "slider.horizontal.3",
         ]),
     ]
 
@@ -217,29 +251,57 @@ struct IconPickerView: View {
 
     static let emojiByCategory: [(String, [String])] = [
         ("Folders & Files", [
-            "📁", "📂", "🗂️", "📋", "📌", "📍", "📎", "🔗", "🔖",
-            "📝", "✏️", "📄", "🗒️", "🗃️", "🗄️"
+            "📁", "📂", "🗂️", "📋", "📌", "📍", "📎", "🖇️", "🔗", "🔖",
+            "📝", "✏️", "📄", "📃", "🗒️", "🗃️", "🗄️", "📦", "💾", "💿",
+            "📊", "📈", "📉", "🗑️", "📜",
         ]),
         ("Shopping & Money", [
-            "🛒", "🛍️", "💰", "💵", "💳", "💎", "🎁", "🎀", "🏷️", "⌚", "👜"
+            "🛒", "🛍️", "👜", "👛", "👝", "💰", "💵", "💴", "💶", "💷", "🪙",
+            "💳", "🧾", "💎", "🎁", "🎀", "🏷️", "⌚", "💍", "💸", "🤑",
+            "📦", "🏪", "🏬",
         ]),
         ("Technology", [
-            "💻", "🖥️", "⌨️", "🖱️", "📱", "📡", "🔌", "🔋", "💡", "🔦", "📷", "🎥", "🖨️", "🕹️"
+            "💻", "🖥️", "⌨️", "🖱️", "📱", "📲", "📡", "🔌", "🔋", "🪫",
+            "💡", "🔦", "📷", "📸", "🎥", "🖨️", "🖲️", "🕹️", "🤖",
+            "⚙️", "🔬", "🔭", "🧬", "📟", "📠",
         ]),
         ("Media & Art", [
-            "🎵", "🎶", "🎸", "🎹", "🎬", "🎭", "🎨", "🖼️", "🎤", "📻", "📺", "🎙️"
+            "🎵", "🎶", "🎸", "🎹", "🥁", "🪘", "🎷", "🎺", "🎻", "🪗",
+            "🎬", "🎭", "🎨", "🖼️", "🖌️", "🎤", "🎙️",
+            "📻", "📺", "🎞️", "📽️", "🎮",
         ]),
         ("Nature", [
-            "🌿", "🌱", "🌳", "🌸", "🌺", "🍀", "🌙", "☀️", "🌈", "🔥", "💧", "❄️"
+            "🌿", "🌱", "🌳", "🌲", "🌴", "🌵", "🍀", "🌸", "🌺", "🌻",
+            "🌹", "🌷", "🍃", "🍂", "🍁", "🍄", "🌾", "🪸",
+            "🌙", "⭐", "🌟", "☀️", "🌈", "🔥", "💧", "🌊", "❄️", "⛅",
+            "🦁", "🐘", "🦊", "🐺", "🦋", "🐝", "🐠", "🦜",
         ]),
-        ("Food & Travel", [
-            "☕", "🍵", "🍕", "🍜", "✈️", "🚀", "🗺️", "🌍", "🏖️", "🏠", "🏢", "🚗", "🎒"
+        ("Food & Drink", [
+            "☕", "🍵", "🧃", "🥤", "🧋", "🍺", "🍷", "🥂", "🍾",
+            "🍕", "🍔", "🌮", "🌯", "🍜", "🍣", "🍱", "🥗", "🥘", "🍰", "🎂",
+            "🥩", "🧁", "🍩", "🍪", "🥐", "🍎", "🍊", "🍋", "🍇", "🫐",
+        ]),
+        ("Travel & Places", [
+            "✈️", "🚀", "🛸", "🚗", "🚙", "🚂", "🚢", "🛳️", "🚲",
+            "🗺️", "🌍", "🌎", "🌏", "🧭",
+            "🏖️", "🏔️", "🏕️", "🗼", "🗽", "🏯", "🏰",
+            "🏠", "🏢", "🏨", "⛪", "🎒", "🧳",
+        ]),
+        ("People & Social", [
+            "🧑", "👩", "👨", "👶", "🧓", "👥", "🤝", "🫂",
+            "🥰", "😊", "😎", "🤩", "🙌", "👏", "💪", "🫶",
+            "❤️", "🧡", "💛", "💚", "💙", "💜",
         ]),
         ("Symbols & Signals", [
-            "❤️", "⭐", "🎯", "🏆", "🥇", "💪", "🧠", "👀", "✅", "⚡", "💫", "🔮", "🎉"
+            "⭐", "🌟", "💫", "✨", "🎯", "🏆", "🥇", "🥈", "🥉", "🏅", "🎖️",
+            "🧠", "👀", "✅", "❌", "⚡", "🔮", "🎉", "🎊", "🧩",
+            "🔑", "🗝️", "🔓", "🔐", "⚠️", "🚫", "♾️",
         ]),
         ("Activities", [
-            "📚", "📖", "🎮", "⚽", "🏃", "🧘", "✍️", "🔬", "🔭", "🧪", "🏋️", "🚴", "🎲", "♟️"
+            "📚", "📖", "🎮", "⚽", "🏀", "🎾", "🏈", "⚾", "🏓", "🎯",
+            "🏃", "🧘", "🏋️", "🚴", "🤸", "🏊", "⛷️", "🏄", "🧗", "🤿",
+            "✍️", "🎲", "♟️", "🎳", "🎸", "🎻",
+            "🔬", "🔭", "🧪", "🧬",
         ]),
     ]
 }
@@ -411,13 +473,12 @@ private struct IconGridPopover: View {
                         TextField("Type or paste any emoji…", text: $customEmoji)
                             .textFieldStyle(.roundedBorder)
                             .onChange(of: customEmoji) {
-                                // Accept the first emoji-like character typed
                                 let trimmed = customEmoji.trimmingCharacters(in: .whitespaces)
-                                if !trimmed.isEmpty && !isSFSymbolName(trimmed) {
-                                    // Keep only the first "character" (emoji can be multi-scalar)
-                                    let first = String(trimmed.prefix(2))
-                                    customEmoji = first
-                                }
+                                guard !trimmed.isEmpty && !isSFSymbolName(trimmed) else { return }
+                                // Swift's Character type handles multi-scalar grapheme clusters,
+                                // so prefix(1) correctly captures any single emoji including ZWJ sequences.
+                                let first = String(trimmed.prefix(1))
+                                if customEmoji != first { customEmoji = first }
                             }
                         Button("Use") {
                             let trimmed = customEmoji.trimmingCharacters(in: .whitespaces)
