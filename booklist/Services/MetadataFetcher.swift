@@ -13,6 +13,8 @@ nonisolated struct PageMetadata {
     /// Non-nil when the page is a Reddit post — used to generate a synthetic card image.
     let redditSubreddit: String?
     let redditAuthor: String?
+    /// Shop product page (currently Amazon) — capture defaults these to wishlist items.
+    var isProductPage = false
 }
 
 // MARK: - Errors
@@ -98,7 +100,8 @@ nonisolated struct MetadataFetcher {
         }
 
         let html = decoded(data: data, response: response)
-        return parse(html: html, baseURL: url)
+        // The final URL, so short links (amzn.to, a.co) are recognised after their redirect.
+        return parse(html: html, baseURL: response.url ?? url)
     }
 
     // MARK: - Charset detection
@@ -124,7 +127,9 @@ nonisolated struct MetadataFetcher {
 
     // MARK: - HTML parsing
 
-    private static func parse(html: String, baseURL: URL) -> PageMetadata {
+    /// Internal (not private) for tests.
+    static func parse(html: String, baseURL: URL) -> PageMetadata {
+        let isAmazon = isAmazonURL(baseURL)
         let title = ogMeta("og:title", in: html)
             ?? titleTag(in: html)
             ?? baseURL.host
@@ -136,15 +141,19 @@ nonisolated struct MetadataFetcher {
         let faviconURL = faviconHref(in: html, baseURL: baseURL)
             ?? "\(baseURL.scheme ?? "https")://\(baseURL.host ?? "")/favicon.ico"
 
-        let price = extractPrice(from: html)
+        let price = (isAmazon ? amazonPrice(in: html) : nil) ?? extractPrice(from: html)
 
         var images: [String] = []
         func addImage(_ raw: String?) {
             guard let raw,
                   let resolved = resolveURL(raw, baseURL: baseURL),
                   !images.contains(resolved) else { return }
+            // Amazon UI graphics (nav sprites, Prime badges) live under /images/G/;
+            // product photos are under /images/I/.
+            if isAmazon && resolved.contains("/images/G/") { return }
             images.append(resolved)
         }
+        if isAmazon { addImage(amazonMainImage(in: html)) }
         addImage(ogMeta("og:image",         in: html))
         addImage(ogMeta("og:image:url",     in: html))
         addImage(namedMeta("twitter:image",     in: html))
@@ -161,8 +170,41 @@ nonisolated struct MetadataFetcher {
             imageURLs: images,
             price: price,
             redditSubreddit: nil,
-            redditAuthor: nil
+            redditAuthor: nil,
+            isProductPage: isAmazon
         )
+    }
+
+    // MARK: - Amazon
+
+    /// amazon.es, amazon.com, amazon.co.uk, … (any Amazon storefront).
+    static func isAmazonURL(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host.range(of: #"(^|\.)amazon\.[a-z]{2,3}(\.[a-z]{2})?$"#, options: .regularExpression) != nil
+    }
+
+    /// Amazon has no structured price data; the "price to pay" is a screen-reader span
+    /// (`a-offscreen`) inside the buy box, also mirrored in the buy-box JSON as `displayPrice`.
+    private static func amazonPrice(in html: String) -> String? {
+        let patterns = [
+            #"(?:apex-pricetopay-value|priceToPay)[^>]*>\s*<span class="a-offscreen">([^<]+)<"#,
+            #""displayPrice":"([^"]+)""#,
+            #"<span class="a-price[^"]*"[^>]*>\s*<span class="a-offscreen">([^<]+)<"#,
+        ]
+        for pattern in patterns {
+            if let value = firstCapture(pattern, in: html).map({ clean($0) }), looksLikePrice(value) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    /// The product photo: `#landingImage` (most products) or `#imgBlkFront` (books).
+    /// `data-old-hires` is the large version; `src` is a ~300 px thumbnail.
+    private static func amazonMainImage(in html: String) -> String? {
+        guard let tag = firstCapture(#"(<img[^>]+id="(?:landingImage|imgBlkFront)"[^>]*>)"#, in: html) else { return nil }
+        if let hires = firstCapture(#"data-old-hires="([^"]+)""#, in: tag) { return hires }
+        return firstCapture(#"\ssrc="([^"]+)""#, in: tag)
     }
 
     // MARK: - Price extraction

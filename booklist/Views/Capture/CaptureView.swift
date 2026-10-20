@@ -469,9 +469,15 @@ struct CaptureView: View {
     private func fetchMetadata(for urlString: String) async {
         isFetching = true
         fetchError = nil
+        // Shop links default to wishlist — set before fetching so it applies even if the
+        // shop blocks the request.
+        if let url = URL(string: urlString), MetadataFetcher.isAmazonURL(url) {
+            isWishlistItem = true
+        }
 
         do {
             let meta = try await MetadataFetcher.fetch(urlString: urlString)
+            if meta.isProductPage { isWishlistItem = true }
             title            = meta.title
             pageDescription  = meta.description
             faviconURL       = meta.faviconURL

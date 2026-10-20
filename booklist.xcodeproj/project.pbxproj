@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1714162630874F4800517B3B /* RedditOEmbedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1714162530874F4800517B3B /* RedditOEmbedTests.swift */; };
+		17141628308754DE00517B3B /* AmazonParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17141627308754DE00517B3B /* AmazonParsingTests.swift */; };
 		178314BA2F97650300922140 /* booklist share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 178314AE2F97650300922140 /* booklist share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		178E71452FB70B0C002D66E9 /* FolderTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178E71442FB70B0C002D66E9 /* FolderTreeTests.swift */; };
 		178E71492FB7DBD4002D66E9 /* MasonryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178E71482FB7DBD4002D66E9 /* MasonryTests.swift */; };
@@ -61,6 +62,7 @@
 
 /* Begin PBXFileReference section */
 		1714162530874F4800517B3B /* RedditOEmbedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditOEmbedTests.swift; sourceTree = "<group>"; };
+		17141627308754DE00517B3B /* AmazonParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmazonParsingTests.swift; sourceTree = "<group>"; };
 		1783145A2F94F46300922140 /* booklist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = booklist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314AE2F97650300922140 /* booklist share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "booklist share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314D92FA153BE00922140 /* booklistTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = booklistTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -209,6 +211,7 @@
 				17DB62E93086333A0090B616 /* PriceFormatterTests.swift */,
 				17DB62F230866DF20090B616 /* IconCatalogTests.swift */,
 				1714162530874F4800517B3B /* RedditOEmbedTests.swift */,
+				17141627308754DE00517B3B /* AmazonParsingTests.swift */,
 			);
 			path = booklistTests;
 			sourceTree = "<group>";
@@ -407,6 +410,7 @@
 			files = (
 				AA22000000000001AABB0001 /* booklistTests.swift in Sources */,
 				178E71492FB7DBD4002D66E9 /* MasonryTests.swift in Sources */,
+				17141628308754DE00517B3B /* AmazonParsingTests.swift in Sources */,
 				17DB627E308628030090B616 /* ViewModeMemoryTests.swift in Sources */,
 				AA22000000000002AABB0002 /* BookmarkModelTests.swift in Sources */,
 				AA22000000000003AABB0003 /* ColorHexTests.swift in Sources */,
