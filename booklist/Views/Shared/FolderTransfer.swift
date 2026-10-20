@@ -95,18 +95,32 @@ struct FolderDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         let dropZone = zone(for: info)
         zone = nil
-        defer { FolderDrag.draggedID = nil }
+        // Read the dragged folder BEFORE clearing the drag state — `dragged` is derived from it.
+        let dragged = self.dragged
+        FolderDrag.draggedID = nil
         guard let dragged, isAllowed(dragged, dropZone) else { return false }
-        switch (dropZone, target) {
-        case (.into, let target):
-            return FolderTree.move(dragged, into: target, folders: allFolders)
-        case (.before, let target?):
-            return FolderTree.place(dragged, besides: target, after: false, folders: allFolders)
-        case (.after, let target?):
-            return FolderTree.place(dragged, besides: target, after: true, folders: allFolders)
-        case (_, nil):
-            return false
+
+        // Apply the move only after the drag session has fully ended. Moving the folder right
+        // away rebuilt its sidebar row while the drag was still finishing, leaving the gesture
+        // system mid-stream — later drags and clicks in the sidebar then misbehaved.
+        let target = target
+        let folders = allFolders
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(80))
+            withAnimation(.easeInOut(duration: 0.2)) {
+                switch (dropZone, target) {
+                case (.into, let target):
+                    FolderTree.move(dragged, into: target, folders: folders)
+                case (.before, let target?):
+                    FolderTree.place(dragged, besides: target, after: false, folders: folders)
+                case (.after, let target?):
+                    FolderTree.place(dragged, besides: target, after: true, folders: folders)
+                case (_, nil):
+                    break
+                }
+            }
         }
+        return true
     }
 }
 

@@ -27,8 +27,10 @@ struct SyncService {
 
     // MARK: - Public state
 
+    /// Always false under UI tests (`-uiTesting`): their throwaway sample data must never be
+    /// exported over the user's real sync file on quit, or imported from it on launch.
     static var isEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "syncEnabled") }
+        get { !LaunchMode.isUITesting && UserDefaults.standard.bool(forKey: "syncEnabled") }
         set { UserDefaults.standard.set(newValue, forKey: "syncEnabled") }
     }
 

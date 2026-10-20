@@ -59,6 +59,7 @@ struct FolderRowView: View {
         if children.isEmpty {
             folderLabel
                 .tag(SidebarSelection.folder(folder.id))
+                .itemProvider { FolderDrag.itemProvider(for: folder) }
         } else {
             DisclosureGroup {
                 ForEach(children) { child in
@@ -68,6 +69,7 @@ struct FolderRowView: View {
                 folderLabel
             }
             .tag(SidebarSelection.folder(folder.id))
+            .itemProvider { FolderDrag.itemProvider(for: folder) }
         }
     }
 
@@ -87,7 +89,9 @@ struct FolderRowView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowHeight = $0 }
         // One drag does both reorder and nest (replaces List's onMove, which stops receiving
         // drags once rows are draggable): top quarter = above, middle = inside, bottom = below.
-        .onDrag { FolderDrag.itemProvider(for: folder) }
+        // The drag source is the row-level `.itemProvider` in `rowContent` (List-native row drag).
+        // `.onDrag`/`.draggable` on this label stopped starting after one drag, and
+        // `.itemProvider` placed on the label itself never starts at all.
         .onDrop(of: [.folderTransfer], delegate: FolderDropDelegate(
             target: folder, allFolders: allFolders, rowHeight: rowHeight, zone: $folderDropZone
         ))

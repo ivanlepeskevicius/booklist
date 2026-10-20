@@ -22,6 +22,14 @@
         "identifier" : "178314D82FA153BE00922140",
         "name" : "booklistTests"
       }
+    },
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:booklist.xcodeproj",
+        "identifier" : "17DB62F7308673BF0090B616",
+        "name" : "booklistUITests"
+      }
     }
   ],
   "version" : 1

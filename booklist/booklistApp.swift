@@ -246,11 +246,24 @@ private struct MenuBarIcon: View {
         Image(systemName: "bookmark.fill")
             .onAppear {
                 appDelegate.openMainWindow = { openWindow(id: AppDelegate.mainWindowID) }
+                // UI tests launch the app in the background, where SwiftUI doesn't create the
+                // initial window — open it explicitly so the test has something to drive.
+                if LaunchMode.isUITesting {
+                    appDelegate.bringUpMainWindow(thenCapture: false)
+                }
             }
     }
 }
 
 // MARK: - App
+
+// MARK: - Launch mode
+
+/// UI tests launch with `-uiTesting`: an in-memory store filled with sample data and sync
+/// switched off, so a test run can never touch the real library or overwrite the sync file.
+nonisolated enum LaunchMode {
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
+}
 
 @main
 struct booklistApp: App {
@@ -265,7 +278,7 @@ struct booklistApp: App {
             Folder.self,
             Tag.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: LaunchMode.isUITesting)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
