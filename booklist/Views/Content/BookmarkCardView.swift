@@ -245,8 +245,8 @@ struct BookmarkCardView: View {
         .frame(maxWidth: .infinity, maxHeight: thumbnailStyle == .fill ? 160 : 500)
         .clipped()
         .onScrollVisibilityChange(threshold: 0.01) { isOnScreen = $0 }
-        // nil while off-screen, which releases the decoded image; masonry builds every card
-        // up front, so without this memory would grow with the size of the library.
+        // nil while off-screen, which releases the decoded image; lazy stacks keep the cards
+        // the user has scrolled past, so without this memory would grow with scrolling.
         .task(id: isOnScreen ? bookmark.selectedImageURL : nil) { await loadThumbnail() }
     }
 

@@ -263,6 +263,8 @@ private struct MenuBarIcon: View {
 /// switched off, so a test run can never touch the real library or overwrite the sync file.
 nonisolated enum LaunchMode {
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
+    /// `-stressItems 3000` (UI tests only): fill the in-memory store with a large library.
+    static let stressItems = isUITesting ? UserDefaults.standard.integer(forKey: "stressItems") : 0
 }
 
 @main
@@ -306,7 +308,9 @@ struct booklistApp: App {
                     }
                     #if DEBUG
                     // Populate sample data only when sync isn't configured.
-                    if !SyncService.isEnabled {
+                    if LaunchMode.stressItems > 0 {
+                        StressData.populate(count: LaunchMode.stressItems, in: sharedModelContainer.mainContext)
+                    } else if !SyncService.isEnabled {
                         SampleData.populate(in: sharedModelContainer.mainContext)
                     }
                     #endif
@@ -314,6 +318,13 @@ struct booklistApp: App {
                     let context = sharedModelContainer.mainContext
                     try? context.save()
                     context.undoManager?.removeAllActions()
+                    // Never with the UI-test store: its in-memory library doesn't reference the
+                    // user's real images, which would all look orphaned.
+                    if !LaunchMode.isUITesting,
+                       let bookmarks = try? context.fetch(FetchDescriptor<Bookmark>()) {
+                        let imageURLs = bookmarks.flatMap { $0.imageURLs + [$0.selectedImageURL].compactMap { $0 } }
+                        await StorageCleanup.run(referencedImageFiles: StorageCleanup.referencedFiles(imageURLs))
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)

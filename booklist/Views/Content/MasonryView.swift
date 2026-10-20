@@ -1,10 +1,15 @@
 import SwiftUI
 import SwiftData
 
-/// True masonry (variable-height Pinterest-style columns).
-/// Uses the Layout protocol to place each item in the shortest column.
-/// Not lazy — all card sizes are measured upfront — but for personal-scale collections
-/// this is imperceptible and gives correct column heights without grid-row uniformity.
+/// Pinterest-style columns: each card goes into the currently shortest column.
+///
+/// Built to stay light on large libraries (measured: the old all-cards-up-front layout froze
+/// for 20–80 s and peaked at 2.4 GB from 500 items up):
+/// - **Lazy columns** — each column is a `LazyVStack`, so only cards near the screen exist.
+/// - **Batches** — the columns hold `batchSize` cards and grow as the user nears the bottom,
+///   so placement work is bounded by how far they scroll, not by the library size.
+/// - Placement uses *estimated* card heights (image aspect read from the file header, text
+///   lines from the font sizes), so cards can be placed before they're built.
 struct MasonryView: View {
     let bookmarks: [Bookmark]
     let onManage: (Bookmark) -> Void
@@ -16,32 +21,71 @@ struct MasonryView: View {
     @Query private var allFolders: [Folder]
     @Query(sort: \Tag.name) private var allTags: [Tag]
     @AppStorage("cardSizeScale") private var cardSizeScale = 1.0
+    @AppStorage("showTitleOnCards") private var showTitleOnCards = true
+    @AppStorage("showDateOnCards")  private var showDateOnCards  = true
+    @AppStorage("cardTitleSize")    private var cardTitleSize    = 14.0
+    @AppStorage("cardNoteSize")     private var cardNoteSize     = 12.0
     @State private var anchorID: UUID?
     /// The card arrow keys move from — the last one clicked or reached by keyboard.
     /// Separate from `anchorID` so Shift+arrow can grow the selection while the anchor stays put.
     @State private var leadID: UUID?
-    @State private var cardFrames = CardFrames()
+    @State private var shownCount = MasonryView.batchSize
+    @State private var availableWidth: CGFloat = 0
     @FocusState private var isFocused: Bool
 
+    static let batchSize = 150
     private let spacing: CGFloat = 12
     private let padding: CGFloat = 16
-    private static let coordinateSpace = "masonry"
-
-    /// Card frames for arrow-key navigation. A plain class (not @Observable) so layout
-    /// updates don't trigger re-renders — the frames are only read on key presses.
-    private final class CardFrames {
-        var byID: [UUID: CGRect] = [:]
-    }
 
     /// Fewer, wider columns = bigger cards; more, narrower columns = smaller cards.
     private var columnCount: Int { MasonryLayout.columnCount(for: cardSizeScale) }
 
+    private var layout: MasonryLayout { MasonryLayout(columns: columnCount, spacing: spacing) }
+
+    private var cardWidth: CGFloat { max(1, layout.itemWidth(in: availableWidth - padding * 2)) }
+
+    /// Column assignment and estimated frames for the cards in the current batch.
+    private var placement: MasonryLayout.Placement {
+        let shown = bookmarks.prefix(shownCount)
+        let width = cardWidth
+        let heights = shown.map { bookmark in
+            MasonryEstimate.cardHeight(
+                width: width,
+                imageAspect: bookmark.selectedImageURL.flatMap { ImageStore.aspectRatio(ofLocalImage: $0) },
+                hasImage: bookmark.selectedImageURL != nil,
+                title: showTitleOnCards ? bookmark.title : nil, titleSize: cardTitleSize,
+                note: bookmark.itemType == .bookmark ? bookmark.note : nil, noteSize: cardNoteSize,
+                showsDate: showDateOnCards
+            )
+        }
+        return layout.place(heights: heights, itemWidth: width)
+    }
+
     var body: some View {
+        let placement = placement
+        let shown = Array(bookmarks.prefix(shownCount))
         ScrollViewReader { proxy in
             ScrollView {
-                cards
-                    .coordinateSpace(.named(Self.coordinateSpace))
-                    .padding(padding)
+                HStack(alignment: .top, spacing: spacing) {
+                    ForEach(placement.columns.indices, id: \.self) { column in
+                        LazyVStack(spacing: spacing) {
+                            // Identified by bookmark, not position, so a card's state (its image)
+                            // never ends up on a different bookmark after a delete or reorder.
+                            ForEach(placement.columns[column].map { shown[$0] }) { bookmark in
+                                card(for: bookmark)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .top)
+                    }
+                }
+                .padding(padding)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+            // Next batch when the user is within two screens of the bottom.
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.containerSize.height * 3 >= geometry.contentSize.height
+            } action: { _, nearBottom in
+                if nearBottom { loadMore() }
             }
             .focusable()
             .focusEffectDisabled()
@@ -52,7 +96,8 @@ struct MasonryView: View {
             }
             // Arrow = move the selection; Shift+arrow = add the next card to it.
             .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { press in
-                moveSelection(press.key, extending: press.modifiers.contains(.shift), proxy: proxy)
+                moveSelection(press.key, extending: press.modifiers.contains(.shift),
+                              placement: placement, shown: shown, proxy: proxy)
                 return .handled
             }
             // Space = reader (like Quick Look), Return = open in browser — single selection only.
@@ -69,45 +114,42 @@ struct MasonryView: View {
         }
     }
 
+    private func loadMore() {
+        guard shownCount < bookmarks.count else { return }
+        shownCount += Self.batchSize
+    }
+
     private var singleSelected: Bookmark? {
         guard selectedIDs.count == 1, let id = selectedIDs.first else { return nil }
         return bookmarks.first { $0.id == id }
     }
 
-    private var cards: some View {
-        MasonryLayout(columns: columnCount, spacing: spacing) {
-            ForEach(bookmarks) { bookmark in
-                BookmarkCardView(
-                    bookmark: bookmark,
-                    onOpen:   { open(bookmark) },
-                    onDelete: { delete($0) },
-                    onManage: { onManage(bookmark) },
-                    onRead:   bookmark.itemType == .bookmark ? { onRead(bookmark) } : nil,
-                    thumbnailStyle: .fit,
-                    isSelected: selectedIDs.contains(bookmark.id),
-                    selectedIDs: selectedIDs,
-                    onSelect: { cmdHeld, shiftHeld in
-                        select(bookmark.id, cmdHeld: cmdHeld, shiftHeld: shiftHeld)
-                        isFocused = true   // so arrow keys work right after a click
-                    },
-                    shareBookmarks: shareTargets(for: bookmark),
-                    showsUnfiledDot: showsUnfiledDot,
-                    folders: allFolders,
-                    tags: allTags
-                )
-                .id(bookmark.id)
-                .onGeometryChange(for: CGRect.self) { proxy in
-                    proxy.frame(in: .named(Self.coordinateSpace))
-                } action: { frame in
-                    cardFrames.byID[bookmark.id] = frame
-                }
-            }
-        }
+    private func card(for bookmark: Bookmark) -> some View {
+        BookmarkCardView(
+            bookmark: bookmark,
+            onOpen:   { open(bookmark) },
+            onDelete: { delete($0) },
+            onManage: { onManage(bookmark) },
+            onRead:   bookmark.itemType == .bookmark ? { onRead(bookmark) } : nil,
+            thumbnailStyle: .fit,
+            isSelected: selectedIDs.contains(bookmark.id),
+            selectedIDs: selectedIDs,
+            onSelect: { cmdHeld, shiftHeld in
+                select(bookmark.id, cmdHeld: cmdHeld, shiftHeld: shiftHeld)
+                isFocused = true   // so arrow keys work right after a click
+            },
+            shareBookmarks: shareTargets(for: bookmark),
+            showsUnfiledDot: showsUnfiledDot,
+            folders: allFolders,
+            tags: allTags
+        )
+        .id(bookmark.id)
     }
 
     // MARK: - Keyboard navigation
 
-    private func moveSelection(_ key: KeyEquivalent, extending: Bool, proxy: ScrollViewProxy) {
+    private func moveSelection(_ key: KeyEquivalent, extending: Bool, placement: MasonryLayout.Placement,
+                               shown: [Bookmark], proxy: ScrollViewProxy) {
         let target: UUID?
         let lead = leadID.flatMap { selectedIDs.contains($0) ? $0 : nil }
             ?? (selectedIDs.count == 1 ? selectedIDs.first : nil)
@@ -118,9 +160,10 @@ struct MasonryView: View {
             case .leftArrow: .left
             default:         .right
             }
-            // Only cards still on screen — frames of removed bookmarks may linger.
-            let visibleIDs = Set(bookmarks.map(\.id))
-            let frames = cardFrames.byID.filter { visibleIDs.contains($0.key) }
+            // Estimated frames cover every card in the batch, built or not — lazy columns only
+            // create the cards near the screen.
+            var frames: [UUID: CGRect] = [:]
+            for (index, frame) in placement.frames.enumerated() { frames[shown[index].id] = frame }
             target = MasonryNavigation.neighbor(of: current, direction: direction, frames: frames)
         } else {
             // Nothing selected yet — any arrow starts at the first card.
@@ -223,52 +266,33 @@ enum MasonryNavigation {
     }
 }
 
-// MARK: - Masonry layout engine
+// MARK: - Placement
 
-/// Places subviews in the shortest available column at each step,
-/// producing a true variable-height masonry arrangement.
-struct MasonryLayout: Layout {
+/// Column maths for the masonry: widths, shortest-column placement and estimated frames.
+nonisolated struct MasonryLayout {
     let columns: Int
     let spacing: CGFloat
 
-    struct Cache {
-        var itemSizes: [CGSize] = []
+    struct Placement {
+        /// Item indices per column, top to bottom.
+        var columns: [[Int]]
+        /// Estimated frame of each item, by index (for arrow-key navigation).
+        var frames: [CGRect]
     }
 
-    func makeCache(subviews: Subviews) -> Cache { Cache() }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
-        guard !subviews.isEmpty, let totalWidth = proposal.width, totalWidth > 0 else { return .zero }
-
-        let colWidth = itemWidth(in: totalWidth)
-        cache.itemSizes = subviews.map { $0.sizeThatFits(ProposedViewSize(width: colWidth, height: nil)) }
-
-        var colHeights = [CGFloat](repeating: 0, count: columns)
-        for size in cache.itemSizes {
-            colHeights[shortestColumn(in: colHeights)] += size.height + spacing
+    /// Greedy shortest-column placement — the classic masonry rule.
+    func place(heights: [CGFloat], itemWidth: CGFloat) -> Placement {
+        var placement = Placement(columns: Array(repeating: [], count: max(1, columns)), frames: [])
+        var columnHeights = [CGFloat](repeating: 0, count: max(1, columns))
+        placement.frames.reserveCapacity(heights.count)
+        for (index, height) in heights.enumerated() {
+            let column = shortestColumn(in: columnHeights)
+            placement.columns[column].append(index)
+            placement.frames.append(CGRect(x: CGFloat(column) * (itemWidth + spacing), y: columnHeights[column],
+                                           width: itemWidth, height: height))
+            columnHeights[column] += height + spacing
         }
-
-        return CGSize(width: totalWidth, height: max(0, (colHeights.max() ?? 0) - spacing))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
-        guard !subviews.isEmpty else { return }
-
-        let colWidth = itemWidth(in: bounds.width)
-        var colHeights = [CGFloat](repeating: bounds.minY, count: columns)
-
-        let sizes = cache.itemSizes.count == subviews.count
-            ? cache.itemSizes
-            : subviews.map { $0.sizeThatFits(ProposedViewSize(width: colWidth, height: nil)) }
-
-        for (idx, subview) in subviews.enumerated() {
-            let col = shortestColumn(in: colHeights)
-            subview.place(
-                at: CGPoint(x: bounds.minX + CGFloat(col) * (colWidth + spacing), y: colHeights[col]),
-                proposal: ProposedViewSize(width: colWidth, height: sizes[idx].height)
-            )
-            colHeights[col] += sizes[idx].height + spacing
-        }
+        return placement
     }
 
     func itemWidth(in totalWidth: CGFloat) -> CGFloat {
@@ -287,5 +311,32 @@ struct MasonryLayout: Layout {
         case ..<1.35: return 2
         default:      return 1
         }
+    }
+}
+
+/// Estimates a card's height from its content, mirroring BookmarkCardView's layout: image at
+/// its aspect ratio (≤ 500 pt) or a 100 pt placeholder, then title (≤ 2 lines), note (≤ 5
+/// lines) and date with 10 pt padding. Only needs to be close — it decides which column a card
+/// goes in, not the card's real size.
+nonisolated enum MasonryEstimate {
+    static let defaultImageAspect: CGFloat = 4.0 / 3.0
+
+    static func cardHeight(width: CGFloat, imageAspect: CGFloat?, hasImage: Bool,
+                           title: String?, titleSize: Double, note: String?, noteSize: Double,
+                           showsDate: Bool) -> CGFloat {
+        let image = hasImage ? min(500, width / max(0.1, imageAspect ?? defaultImageAspect)) : 100
+        var lines: [CGFloat] = []
+        if let title, !title.isEmpty { lines.append(textHeight(title, width: width - 20, fontSize: titleSize, maxLines: 2)) }
+        if let note, !note.isEmpty { lines.append(textHeight(note, width: width - 20, fontSize: noteSize, maxLines: 5)) }
+        if showsDate { lines.append(13) }
+        guard !lines.isEmpty else { return image }
+        return image + 20 + lines.reduce(0, +) + CGFloat(lines.count - 1) * 5
+    }
+
+    static func textHeight(_ text: String, width: CGFloat, fontSize: Double, maxLines: Int) -> CGFloat {
+        let charsPerLine = max(1, Int(width / (fontSize * 0.52)))
+        let wrapped = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .reduce(0) { $0 + max(1, ($1.count + charsPerLine - 1) / charsPerLine) }
+        return CGFloat(min(maxLines, wrapped)) * fontSize * 1.25
     }
 }

@@ -10,7 +10,7 @@ struct ImageStore {
     /// Longest side, in pixels, of images written to disk. Cards never display larger than this.
     private static let maxStoredPixelSize = 1600
 
-    private static var directory: URL {
+    nonisolated static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir  = base.appendingPathComponent("lepi.booklist/Images", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -88,6 +88,25 @@ struct ImageStore {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         thumbnailCache.setObject(image, forKey: key, cost: cgImage.bytesPerRow * cgImage.height)
         return image
+    }
+
+    private static var aspectCache: [String: CGFloat] = [:]
+
+    /// Width ÷ height of a saved (local) image, read from the file header without decoding the
+    /// pixels — masonry uses it to place cards before they're built. nil for remote images.
+    static func aspectRatio(ofLocalImage urlString: String) -> CGFloat? {
+        if let cached = aspectCache[urlString] { return cached }
+        guard let url = URL(string: urlString), url.isFileURL,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? CGFloat,
+              let height = properties[kCGImagePropertyPixelHeight] as? CGFloat,
+              width > 0, height > 0 else { return nil }
+        // EXIF orientations 5–8 are rotated 90°, so the displayed width is the stored height.
+        let rotated = ((properties[kCGImagePropertyOrientation] as? Int) ?? 1) >= 5
+        let aspect = rotated ? height / width : width / height
+        aspectCache[urlString] = aspect
+        return aspect
     }
 
     /// Fetches a remote URL, returning nil for non-2xx responses — a 404 page is HTML, not an

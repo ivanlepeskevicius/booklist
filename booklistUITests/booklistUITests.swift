@@ -1,5 +1,34 @@
 import XCTest
 
+/// Launches the freshly built booklist.app from the build products folder with `-uiTesting`.
+func launchBooklist(extraArguments: [String] = [], windowTimeout: TimeInterval = 10) -> XCUIApplication {
+    var directory = Bundle(for: FolderDragUITests.self).bundleURL
+    var appURL: URL?
+    for _ in 0..<6 {
+        directory.deleteLastPathComponent()
+        let candidate = directory.appendingPathComponent("booklist.app")
+        if FileManager.default.fileExists(atPath: candidate.path) {
+            appURL = candidate
+            break
+        }
+    }
+    let app = appURL.map { XCUIApplication(url: $0) } ?? XCUIApplication(bundleIdentifier: "lepi.booklist")
+    // Ignore restored window state: if the window was closed at the last quit, macOS would
+    // otherwise relaunch with no window at all.
+    // -showInDock YES (argument domain, this launch only): run as a regular app so the
+    // window is shown — in menu-bar-only mode it can stay hidden under the test runner.
+    app.launchArguments = ["-uiTesting", "-ApplePersistenceIgnoreState", "YES", "-showInDock", "YES"] + extraArguments
+    app.launch()
+    app.activate()
+    if !app.windows.firstMatch.waitForExistence(timeout: 5) {
+        // Fallback: open it from the menu bar icon, like a user would.
+        app.statusItems.firstMatch.click()
+        app.menuItems["Open booklist"].click()
+    }
+    XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: windowTimeout), "No booklist window\n\(app.debugDescription)")
+    return app
+}
+
 /// Drags folders in the sidebar several times in a row — the bug was "first move works,
 /// later ones don't". Runs the real app with `-uiTesting` (in-memory sample data, sync off),
 /// so the user's library and sync file are never touched.
@@ -55,35 +84,6 @@ final class FolderDragUITests: XCTestCase {
     // MARK: - Helpers
 
     private enum Zone { case above, inside, below }
-
-    /// Launches the freshly built booklist.app from the build products folder.
-    private func launchBooklist() -> XCUIApplication {
-        var directory = Bundle(for: FolderDragUITests.self).bundleURL
-        var appURL: URL?
-        for _ in 0..<6 {
-            directory.deleteLastPathComponent()
-            let candidate = directory.appendingPathComponent("booklist.app")
-            if FileManager.default.fileExists(atPath: candidate.path) {
-                appURL = candidate
-                break
-            }
-        }
-        let app = appURL.map { XCUIApplication(url: $0) } ?? XCUIApplication(bundleIdentifier: "lepi.booklist")
-        // Ignore restored window state: if the window was closed at the last quit, macOS would
-        // otherwise relaunch with no window at all.
-        // -showInDock YES (argument domain, this launch only): run as a regular app so the
-        // window is shown — in menu-bar-only mode it can stay hidden under the test runner.
-        app.launchArguments = ["-uiTesting", "-ApplePersistenceIgnoreState", "YES", "-showInDock", "YES"]
-        app.launch()
-        app.activate()
-        if !app.windows.firstMatch.waitForExistence(timeout: 5) {
-            // Fallback: open it from the menu bar icon, like a user would.
-            app.statusItems.firstMatch.click()
-            app.menuItems["Open booklist"].click()
-        }
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10), "No booklist window\n\(app.debugDescription)")
-        return app
-    }
 
     /// Folder rows with subfolders expose their name as the label, leaf rows as the value.
     /// Found by position in the sidebar — predicate queries found the row but then failed to
@@ -142,5 +142,114 @@ final class FolderDragUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
         XCTFail("Expected \(expected), got \(visibleFolderOrder())\n\(app.debugDescription)", file: file, line: line)
+    }
+}
+
+/// Heavy-usage session on a large generated library (`-stressItems`): view switching,
+/// scrolling, card sizes, search, select-all, bulk delete + undo, and opening capture —
+/// repeated for several rounds. Checks the app stays alive and responsive throughout;
+/// memory is sampled from outside the process while it runs.
+///
+/// Timings here are not user-facing timings: before every step XCUITest snapshots the whole
+/// accessibility tree, which makes the List view's table create a row view for *every* row
+/// (~80 s and +1.5 GB at 3,000 items, measured with `sample`). For real numbers, launch the
+/// built app directly with `-uiTesting -stressItems N` and measure with `footprint`.
+/// Opt-in like the other UI tests (`/tmp/booklist-run-ui-tests`).
+final class StressUITests: XCTestCase {
+
+    private var app: XCUIApplication!
+    private var window: XCUIElement { app.windows.firstMatch }
+
+    override func setUpWithError() throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: "/tmp/booklist-run-ui-tests"),
+                          "UI tests drive the mouse; touch /tmp/booklist-run-ui-tests to run them.")
+        continueAfterFailure = false
+        let items = ProcessInfo.processInfo.environment["STRESS_ITEMS"] ?? "3000"
+        // -captureShortcutKey t: argument domain, this launch only — ⌘T opens capture whatever
+        // the user's own setting is.
+        app = launchBooklist(extraArguments: ["-stressItems", items, "-captureShortcutKey", "t"], windowTimeout: 60)
+    }
+
+    override func tearDownWithError() throws {
+        app?.terminate()
+    }
+
+    @MainActor
+    func testHeavyUsage() throws {
+        XCTAssertTrue(app.outlines.firstMatch.waitForExistence(timeout: 60))
+        let rounds = Int(ProcessInfo.processInfo.environment["STRESS_ROUNDS"] ?? "6") ?? 6
+
+        for round in 0..<rounds {
+            XCTContext.runActivity(named: "Round \(round)") { _ in
+                // Big lists: All in masonry, then list, scrolled hard both ways.
+                selectSidebar("All")
+                app.typeKey("1", modifierFlags: .command)
+                scrollContent(times: 8)
+                app.typeKey("2", modifierFlags: .command)
+                scrollContent(times: 8)
+                app.typeKey("1", modifierFlags: .command)
+
+                // Card sizes up and down (each change re-lays out every card).
+                for _ in 0..<3 { app.typeKey("=", modifierFlags: .command) }
+                scrollContent(times: 3)
+                for _ in 0..<3 { app.typeKey("-", modifierFlags: .command) }
+
+                // Jump between sidebar sections and nested folders.
+                for name in ["Inbox", "Wishlist", "Folder \(round)", "Folder \(round).A", "Folder \(round).A.1", "Folder \(round + 1).B", "All"] {
+                    selectSidebar(name)
+                    scrollContent(times: 1)
+                }
+
+                // Search while typing, then clear.
+                app.typeKey("f", modifierFlags: .command)
+                app.typeText("lorem ips")
+                app.typeKey("a", modifierFlags: .command)
+                app.typeText("headphones")
+                app.typeKey("a", modifierFlags: .command)
+                app.typeKey(.delete, modifierFlags: [])
+                app.typeKey(.escape, modifierFlags: [])
+
+                // Select everything in a folder, bulk delete, undo.
+                selectSidebar("Folder \(round + 2)")
+                if let card = firstCardTitle() {
+                    card.click()
+                    app.typeKey("a", modifierFlags: .command)
+                    app.typeKey(.delete, modifierFlags: .command)
+                    app.typeKey("z", modifierFlags: .command)
+                    app.typeKey(.escape, modifierFlags: [])
+                }
+
+                // Open capture and dismiss it.
+                app.typeKey("t", modifierFlags: .command)
+                app.typeKey(.escape, modifierFlags: [])
+
+                XCTAssertEqual(app.state, .runningForeground, "booklist stopped running in round \(round)")
+                XCTAssertTrue(window.exists, "Main window disappeared in round \(round)")
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func selectSidebar(_ name: String) {
+        let sidebar = app.outlines.firstMatch
+        let texts = sidebar.staticTexts
+        guard let index = texts.allElementsBoundByIndex.firstIndex(where: {
+            ($0.label.isEmpty ? ($0.value as? String ?? "") : $0.label) == name
+        }) else { return }   // collapsed subfolder — skip rather than fail
+        texts.element(boundBy: index).click()
+    }
+
+    private func scrollContent(times: Int) {
+        let point = window.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.55))
+        for _ in 0..<times { point.scroll(byDeltaX: 0, deltaY: -1200) }
+        for _ in 0..<times { point.scroll(byDeltaX: 0, deltaY: 1200) }
+    }
+
+    /// A card's title (stress items are titled "<number> …"). Clicking the title selects the
+    /// card; the hover buttons (open link etc.) sit on the image, away from it.
+    private func firstCardTitle() -> XCUIElement? {
+        let title = window.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "^[0-9]+ .*")).firstMatch
+        return title.exists && title.isHittable ? title : nil
     }
 }

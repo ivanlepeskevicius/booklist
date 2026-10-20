@@ -336,3 +336,77 @@ struct CardSizeTests {
         #expect(CardSize.step(from: 0.6, larger: false) == nil) // slider min
     }
 }
+
+// MARK: - Placement (lazy columns)
+
+@Suite("MasonryLayout.place")
+struct MasonryPlacementTests {
+
+    @Test("Each item goes into the shortest column, like the classic masonry")
+    func shortestColumnPlacement() {
+        let layout = MasonryLayout(columns: 3, spacing: 10)
+        // 300 tall goes left; the next two fill the empty columns; the 4th goes under the
+        // shorter of those (column 2, height 100), not under the tall one.
+        let placement = layout.place(heights: [300, 200, 100, 50], itemWidth: 100)
+        #expect(placement.columns == [[0], [1], [2, 3]])
+        #expect(placement.frames[3] == CGRect(x: 220, y: 110, width: 100, height: 50))
+    }
+
+    @Test("Every item is placed exactly once, in order within its column")
+    func everyItemOnce() {
+        let heights = (0..<1_000).map { CGFloat(50 + ($0 * 37) % 400) }
+        let placement = MasonryLayout(columns: 4, spacing: 12).place(heights: heights, itemWidth: 200)
+        let all = placement.columns.flatMap { $0 }
+        #expect(all.sorted() == Array(0..<1_000))
+        #expect(placement.columns.allSatisfy { $0 == $0.sorted() })
+        #expect(placement.frames.count == 1_000)
+    }
+
+    @Test("Columns end up balanced on a large library")
+    func balanced() {
+        let heights = (0..<3_000).map { CGFloat(80 + ($0 * 53) % 500) }
+        let placement = MasonryLayout(columns: 5, spacing: 12).place(heights: heights, itemWidth: 200)
+        let bottoms = placement.columns.map { column in column.map { placement.frames[$0].maxY }.max() ?? 0 }
+        #expect((bottoms.max() ?? 0) - (bottoms.min() ?? 0) <= 580 + 12)   // within one tallest card + gap
+    }
+
+    @Test("Placing 5,000 cards is fast")
+    func fast() {
+        let heights = (0..<5_000).map { CGFloat(80 + ($0 * 53) % 500) }
+        let start = ContinuousClock.now
+        _ = MasonryLayout(columns: 5, spacing: 12).place(heights: heights, itemWidth: 200)
+        #expect(ContinuousClock.now - start < .milliseconds(100))
+    }
+}
+
+@Suite("MasonryEstimate.cardHeight")
+struct MasonryEstimateTests {
+
+    @Test("A portrait image makes a taller card than a landscape one")
+    func aspectMatters() {
+        let portrait = MasonryEstimate.cardHeight(width: 200, imageAspect: 0.5, hasImage: true,
+                                                  title: nil, titleSize: 14, note: nil, noteSize: 12, showsDate: false)
+        let landscape = MasonryEstimate.cardHeight(width: 200, imageAspect: 2, hasImage: true,
+                                                   title: nil, titleSize: 14, note: nil, noteSize: 12, showsDate: false)
+        #expect(portrait == 400)
+        #expect(landscape == 100)
+    }
+
+    @Test("Images are capped at 500 pt, like the card; no image = 100 pt placeholder")
+    func capsAndPlaceholder() {
+        #expect(MasonryEstimate.cardHeight(width: 300, imageAspect: 0.1, hasImage: true,
+                                           title: nil, titleSize: 14, note: nil, noteSize: 12, showsDate: false) == 500)
+        #expect(MasonryEstimate.cardHeight(width: 300, imageAspect: nil, hasImage: false,
+                                           title: nil, titleSize: 14, note: nil, noteSize: 12, showsDate: false) == 100)
+    }
+
+    @Test("Text adds height but stops at the card's line limits")
+    func textLimits() {
+        let short = MasonryEstimate.textHeight("Hello", width: 200, fontSize: 12, maxLines: 5)
+        let long = MasonryEstimate.textHeight(String(repeating: "word ", count: 500), width: 200, fontSize: 12, maxLines: 5)
+        let paragraphs = MasonryEstimate.textHeight("a\nb\nc", width: 200, fontSize: 12, maxLines: 5)
+        #expect(short == 15)
+        #expect(long == 75)          // 5 lines × 12 × 1.25
+        #expect(paragraphs == 45)    // each line break starts a new line
+    }
+}
