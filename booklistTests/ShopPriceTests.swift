@@ -50,4 +50,35 @@ struct ShopPriceTests {
     func monthlyRateOnly() {
         #expect(price(#"<span class="price-monthly-rate">0,89 €/mois</span>"#) == nil)
     }
+
+    // MARK: - Product page detection (capture defaults these to wishlist)
+
+    private func isProductPage(_ html: String) -> Bool {
+        MetadataFetcher.parse(html: html, baseURL: URL(string: "https://shop.example/item")!).isProductPage
+    }
+
+    @Test("A page with a price is a product page")
+    func priceMeansProduct() {
+        #expect(isProductPage(#"<meta property="product:price:amount" content="19.99">"#))
+    }
+
+    @Test("Product pages without a readable price are detected from their markup", arguments: [
+        #"<meta property="og:type" content="product">"#,
+        #"<meta property="og:type" content="og:product">"#,
+        #"<script type="application/ld+json">{"@type":"ProductGroup","name":"Sneaker"}</script>"#,
+        #"<script type="application/ld+json">{"@type": "product", "name":"Headphones"}</script>"#,
+    ])
+    func declaredProduct(_ html: String) {
+        #expect(isProductPage(html))
+    }
+
+    @Test("Articles and other pages are not product pages")
+    func articleIsNotProduct() {
+        let html = """
+        <meta property="og:type" content="article">
+        <script type="application/ld+json">{"@type":"BlogPosting","headline":"Best headphones of 2026"}</script>
+        <p>The Sony WH-1000XM5 is our top pick.</p>
+        """
+        #expect(!isProductPage(html))
+    }
 }

@@ -13,7 +13,8 @@ nonisolated struct PageMetadata {
     /// Non-nil when the page is a Reddit post — used to generate a synthetic card image.
     let redditSubreddit: String?
     let redditAuthor: String?
-    /// Shop product page (currently Amazon) — capture defaults these to wishlist items.
+    /// Shop product page (Amazon, a price was found, or the page declares itself a product)
+    /// — capture defaults these to wishlist items.
     var isProductPage = false
 }
 
@@ -171,8 +172,15 @@ nonisolated struct MetadataFetcher {
             price: price,
             redditSubreddit: nil,
             redditAuthor: nil,
-            isProductPage: isAmazon
+            isProductPage: isAmazon || price != nil || declaresProduct(html)
         )
+    }
+
+    /// Product pages without a readable price still say what they are: a schema.org
+    /// Product in JSON-LD, or `og:type` "product" (also "og:product", "product.item").
+    private static func declaresProduct(_ html: String) -> Bool {
+        if ogMeta("og:type", in: html)?.lowercased().contains("product") == true { return true }
+        return firstCapture(#""@type"\s*:\s*"(Product|ProductGroup)""#, in: html, options: .caseInsensitive) != nil
     }
 
     // MARK: - Amazon

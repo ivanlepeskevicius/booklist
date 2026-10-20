@@ -30,6 +30,8 @@ struct CaptureView: View {
     @State private var selectedFolderID: UUID?
     @State private var selectedTags: [Tag] = []
     @State private var isWishlistItem  = false
+    /// Set once the user flips the wishlist toggle; automatic defaults never override it.
+    @State private var wishlistChosenByUser = false
     @State private var price           = ""
     @State private var managingDuplicate: Bookmark? = nil
     @State private var showingNewFolder  = false
@@ -381,7 +383,10 @@ struct CaptureView: View {
 
     private var wishlistSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: $isWishlistItem) {
+            Toggle(isOn: Binding(
+                get: { isWishlistItem },
+                set: { isWishlistItem = $0; wishlistChosenByUser = true }
+            )) {
                 Label("Save as wishlist item", systemImage: "cart")
                     .font(.subheadline)
             }
@@ -469,15 +474,18 @@ struct CaptureView: View {
     private func fetchMetadata(for urlString: String) async {
         isFetching = true
         fetchError = nil
-        // Shop links default to wishlist — set before fetching so it applies even if the
-        // shop blocks the request.
-        if let url = URL(string: urlString), MetadataFetcher.isAmazonURL(url) {
-            isWishlistItem = true
+        // Shop links default to wishlist — decided before fetching so it applies even if the
+        // shop blocks the request. Recomputed for every new URL (so a shop link followed by a
+        // blog link turns it back off), unless the user has set the toggle themselves.
+        if !wishlistChosenByUser {
+            let isAmazon = URL(string: urlString).map(MetadataFetcher.isAmazonURL) ?? false
+            let saved = allBookmarks.map { (url: $0.url, isWishlist: $0.itemType == .wishlistItem, dateAdded: $0.dateAdded) }
+            isWishlistItem = isAmazon || WishlistSites.lastChoiceWasWishlist(for: urlString, savedItems: saved)
         }
 
         do {
             let meta = try await MetadataFetcher.fetch(urlString: urlString)
-            if meta.isProductPage { isWishlistItem = true }
+            if meta.isProductPage && !wishlistChosenByUser { isWishlistItem = true }
             title            = meta.title
             pageDescription  = meta.description
             faviconURL       = meta.faviconURL

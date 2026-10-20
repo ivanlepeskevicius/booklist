@@ -82,3 +82,30 @@ final class Bookmark {
         self.isRead = false
     }
 }
+
+/// Learns from the library which sites the user saves wishlist items from (no separate list
+/// to store or sync): the most recent item saved from a site decides the default for the next.
+nonisolated enum WishlistSites {
+    /// The host without a leading "www." / "m." — exact otherwise, so the Apple Store
+    /// (www.apple.com) and Apple's docs (developer.apple.com) stay separate.
+    static func site(of urlString: String) -> String? {
+        guard var host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else { return nil }
+        for prefix in ["www.", "m."] where host.hasPrefix(prefix) {
+            host = String(host.dropFirst(prefix.count))
+        }
+        return host
+    }
+
+    /// True when the newest saved item from the same site is a wishlist item. Saving a blog
+    /// post from a shop as a bookmark therefore switches that site's default back off.
+    static func lastChoiceWasWishlist(
+        for urlString: String,
+        savedItems: [(url: String, isWishlist: Bool, dateAdded: Date)]
+    ) -> Bool {
+        guard let site = site(of: urlString) else { return false }
+        return savedItems
+            .filter { self.site(of: $0.url) == site }
+            .max { $0.dateAdded < $1.dateAdded }?
+            .isWishlist ?? false
+    }
+}
