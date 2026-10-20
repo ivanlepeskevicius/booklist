@@ -54,9 +54,11 @@ nonisolated struct MetadataFetcher {
             throw MetadataFetchError.invalidURL
         }
 
-        // Reddit posts: bypass bot protection using their public JSON API
-        if isRedditPostURL(url), let meta = try? await fetchRedditPost(url: url) {
-            return meta
+        // Reddit posts: the HTML page is a JavaScript bot-check titled just "Reddit", so use
+        // the JSON API, then oEmbed (title + author only) when the JSON API is blocked too.
+        if isRedditPostURL(url) {
+            if let meta = try? await fetchRedditPost(url: url) { return meta }
+            if let meta = try? await fetchRedditOEmbed(url: url) { return meta }
         }
 
         var request = URLRequest(url: url, timeoutInterval: 20)
@@ -528,6 +530,86 @@ nonisolated struct MetadataFetcher {
             description: selftext,
             faviconURL: "https://www.reddit.com/favicon.ico",
             imageURLs: images,
+            price: nil,
+            redditSubreddit: subreddit.isEmpty ? nil : subreddit,
+            redditAuthor: author.isEmpty ? nil : author
+        )
+    }
+
+    private static func fetchRedditOEmbed(url: URL) async throws -> PageMetadata {
+        var components = URLComponents(string: "https://www.reddit.com/oembed")
+        components?.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
+        guard let oembedURL = components?.url else { throw MetadataFetchError.invalidURL }
+
+        var request = URLRequest(url: oembedURL, timeoutInterval: 20)
+        request.setValue("booklist/1.0 macOS (by /u/booklist_app)", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw MetadataFetchError.network(
+                NSError(domain: "HTTP", code: http.statusCode, userInfo: nil))
+        }
+        guard let meta = parseRedditOEmbed(data, postURL: url) else { throw MetadataFetchError.decodingFailed }
+        let images = (try? await fetchRedditEmbedImages(url: url)) ?? []
+        guard !images.isEmpty else { return meta }
+        return PageMetadata(
+            title: meta.title,
+            description: meta.description,
+            faviconURL: meta.faviconURL,
+            imageURLs: images,
+            price: meta.price,
+            redditSubreddit: meta.redditSubreddit,
+            redditAuthor: meta.redditAuthor
+        )
+    }
+
+    /// oEmbed has no images, but the embed page (what Reddit shows inside embedded posts)
+    /// isn't bot-blocked and contains the post's images.
+    private static func fetchRedditEmbedImages(url: URL) async throws -> [String] {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return [] }
+        components.host = "embed.reddit.com"
+        components.query = nil
+        guard let embedURL = components.url else { return [] }
+
+        var request = URLRequest(url: embedURL, timeoutInterval: 20)
+        request.setValue("booklist/1.0 macOS (by /u/booklist_app)", forHTTPHeaderField: "User-Agent")
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return redditEmbedImages(in: String(decoding: data, as: UTF8.self))
+    }
+
+    /// Internal (not private) for tests. Post media lives on `*.redd.it`; subreddit icons and
+    /// avatars are on other hosts (e.g. styles.redditmedia.com) and are skipped.
+    static func redditEmbedImages(in html: String) -> [String] {
+        let mediaHosts: Set<String> = ["preview.redd.it", "i.redd.it", "external-preview.redd.it"]
+        var images: [String] = []
+        for attrs in allCaptures("<img([^>]+)>", in: html, options: .caseInsensitive) {
+            guard let raw = firstCapture("\\ssrc=[\"']([^\"'<>]+)[\"']", in: attrs, options: .caseInsensitive) else { continue }
+            let src = raw.replacingOccurrences(of: "&amp;", with: "&")
+            guard let host = URL(string: src)?.host?.lowercased(), mediaHosts.contains(host),
+                  !images.contains(src) else { continue }
+            images.append(src)
+        }
+        return images
+    }
+
+    /// Internal (not private) for tests. oEmbed has no subreddit field — it comes from the
+    /// post URL (`/r/<subreddit>/comments/...`).
+    static func parseRedditOEmbed(_ data: Data, postURL: URL) -> PageMetadata? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawTitle = json["title"] as? String else { return nil }
+        let title = clean(rawTitle)
+        guard !title.isEmpty else { return nil }
+
+        let author = json["author_name"] as? String ?? ""
+        let parts = postURL.pathComponents
+        let subreddit = parts.count > 2 ? parts[2] : ""
+
+        return PageMetadata(
+            title: title,
+            description: nil,
+            faviconURL: "https://www.reddit.com/favicon.ico",
+            imageURLs: [],
             price: nil,
             redditSubreddit: subreddit.isEmpty ? nil : subreddit,
             redditAuthor: author.isEmpty ? nil : author

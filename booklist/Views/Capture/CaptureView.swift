@@ -521,8 +521,13 @@ struct CaptureView: View {
         renderer.scale = 2.0
         guard let image = renderer.nsImage,
               let savedURL = try? ImageStore.save(image) else { return }
-        candidateImages.insert(savedURL, at: 0)
-        selectedImageURL = savedURL
+        // Posts with their own images keep those selected; the card stays available in the picker.
+        if candidateImages.isEmpty {
+            candidateImages = [savedURL]
+            selectedImageURL = savedURL
+        } else {
+            candidateImages.append(savedURL)
+        }
     }
 
     // MARK: - Save
