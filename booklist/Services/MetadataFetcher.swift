@@ -238,16 +238,20 @@ nonisolated struct MetadataFetcher {
     }
 
     private static func priceFromLDObject(_ obj: [String: Any]) -> String? {
-        // Recurse into @graph arrays
-        if let graph = obj["@graph"] as? [[String: Any]] {
-            for item in graph { if let p = priceFromLDObject(item) { return p } }
-        }
         let type = (obj["@type"] as? String ?? "").lowercased()
-        if type == "product" {
-            return priceFromOffers(obj["offers"])
+        if type == "product", let p = priceFromOffers(obj["offers"]) {
+            return p
         }
         if type == "offer" || type == "aggregateoffer" {
             return formatOffer(obj)
+        }
+        // The product can be nested anywhere: `@graph` arrays, `ProductGroup.hasVariant`
+        // (Zalando), `BuyAction.object` (MediaMarkt), …
+        for value in obj.values {
+            if let dict = value as? [String: Any], let p = priceFromLDObject(dict) { return p }
+            if let list = value as? [[String: Any]] {
+                for item in list { if let p = priceFromLDObject(item) { return p } }
+            }
         }
         return nil
     }
@@ -259,10 +263,12 @@ nonisolated struct MetadataFetcher {
     }
 
     private static func formatOffer(_ offer: [String: Any]) -> String? {
+        // AggregateOffer ("from …") carries lowPrice instead of price.
+        let value = offer["price"] ?? offer["lowPrice"]
         let raw: String
-        if      let s = offer["price"] as? String { raw = s }
-        else if let d = offer["price"] as? Double { raw = String(format: "%.2f", d) }
-        else if let i = offer["price"] as? Int    { raw = String(i) }
+        if      let s = value as? String { raw = s }
+        else if let d = value as? Double { raw = String(format: "%.2f", d) }
+        else if let i = value as? Int    { raw = String(i) }
         else { return nil }
 
         guard !raw.isEmpty, raw != "0", raw != "0.0", raw != "0.00" else { return nil }
@@ -338,7 +344,11 @@ nonisolated struct MetadataFetcher {
     /// that looks like a monetary value. Skips elements labelled as strikethrough/original prices.
     private static func visiblePriceText(in html: String) -> String? {
         let skipWords = ["was", "original", "old", "compare", "strike", "crossed",
-                         "before", "regular", "list", "rrp", "msrp", "retail", "from"]
+                         "before", "regular", "list", "rrp", "msrp", "retail", "from",
+                         // Add-ons and extras shown near the product price (e.g. Fnac's
+                         // warranty offers and their "€/mois" instalments)
+                         "crosssell", "cross-sell", "service", "warranty", "insurance",
+                         "shipping", "delivery", "monthly", "instal"]
         // Match opening tag with class/id containing "price", followed by short text content.
         // Uses a non-greedy match so nested tags don't bleed into the content capture.
         let pattern = #"<(?:span|div|strong|p|b|em|h[1-6])[^>]+(?:class|id)="[^"]*price[^"]*"[^>]*>\s*([^<\n]{1,30}?)\s*<"#
@@ -350,6 +360,8 @@ nonisolated struct MetadataFetcher {
             let tag  = html[fullRange].lowercased()
             if skipWords.contains(where: { tag.contains($0) }) { continue }
             let text = String(html[textRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            // "0,89 €/mois", "$5/mo" — a rate, not the item's price.
+            if text.contains("/") { continue }
             if looksLikePrice(text) { return text }
         }
         return nil
