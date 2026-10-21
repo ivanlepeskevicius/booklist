@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 /// Launches the freshly built booklist.app from the build products folder with `-uiTesting`.
@@ -251,5 +252,235 @@ final class StressUITests: XCTestCase {
     private func firstCardTitle() -> XCUIElement? {
         let title = window.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "^[0-9]+ .*")).firstMatch
         return title.exists && title.isHittable ? title : nil
+    }
+}
+
+/// Everyday flows, the way a user would do them: capture (page + shop link), the wishlist
+/// toggle respecting the user's choice, delete + undo, search, Settings, keyboard + reader,
+/// and a long masonry list loading more cards. Uses the in-memory sample library
+/// (`-uiTesting`); capture and the reader load real web pages.
+/// Opt-in like the other UI tests (`/tmp/booklist-run-ui-tests`).
+final class UserFlowUITests: XCTestCase {
+
+    private var app: XCUIApplication!
+    private var window: XCUIElement { app.windows.firstMatch }
+
+    override func setUpWithError() throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: "/tmp/booklist-run-ui-tests"),
+                          "UI tests drive the mouse; touch /tmp/booklist-run-ui-tests to run them.")
+        continueAfterFailure = false
+    }
+
+    override func tearDownWithError() throws {
+        app?.terminate()
+    }
+
+    private func launch(_ extra: [String] = []) {
+        app = launchBooklist(extraArguments: ["-captureShortcutKey", "t"] + extra, windowTimeout: 30)
+        XCTAssertTrue(app.outlines.firstMatch.waitForExistence(timeout: 30))
+    }
+
+    // MARK: - Capture
+
+    @MainActor
+    func testCaptureAPage() throws {
+        launch()
+        let sheet = openCapture()
+        paste("https://en.wikipedia.org/wiki/Avatar:_The_Last_Airbender", into: sheet.textFields["Paste a link…"])
+        XCTAssertTrue(waitForText(in: sheet, containing: "Avatar", timeout: 25), "Title wasn't fetched\n\(sheet.debugDescription)")
+        XCTAssertTrue(sheet.buttons["Save Bookmark"].isEnabled)
+        app.typeKey(.return, modifierFlags: .command)
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 10), "Capture didn't close after ⌘Return")
+        XCTAssertTrue(waitForText(in: window, containing: "Avatar", timeout: 10), "Saved page isn't in the Inbox")
+    }
+
+    @MainActor
+    func testCaptureAShopLink() throws {
+        launch()
+        let sheet = openCapture()
+        paste("https://www.amazon.es/gp/product/B0GT9F92N2?smid=A1PQIIO52BJNPL&psc=1", into: sheet.textFields["Paste a link…"])
+        XCTAssertTrue(sheet.buttons["Save to Wishlist"].waitForExistence(timeout: 10), "Amazon link didn't default to wishlist\n\(sheet.debugDescription)")
+        XCTAssertTrue(waitForText(in: sheet, containing: "Outsunny", timeout: 25), "Title wasn't fetched\n\(sheet.debugDescription)")
+        let priceFilled = waitUntil(timeout: 10) {
+            sheet.textFields.allElementsBoundByIndex.contains { ($0.value as? String)?.contains(where: \.isNumber) == true && ($0.value as? String)?.contains(".") == true }
+        }
+        XCTAssertTrue(priceFilled, "Price wasn't filled in\n\(sheet.debugDescription)")
+        app.typeKey(.return, modifierFlags: .command)
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 10))
+        selectSidebar("Wishlist")
+        XCTAssertTrue(waitForText(in: window, containing: "Outsunny", timeout: 10), "Saved item isn't in the Wishlist")
+    }
+
+    @MainActor
+    func testWishlistToggleRespectsUserChoice() throws {
+        launch()
+        let sheet = openCapture()
+        paste("https://www.amazon.es/gp/product/B0GT9F92N2?smid=A1PQIIO52BJNPL&psc=1", into: sheet.textFields["Paste a link…"])
+        XCTAssertTrue(sheet.buttons["Save to Wishlist"].waitForExistence(timeout: 10))
+        // Turn it off right away — before the page has finished loading.
+        sheet.switches.firstMatch.click()
+        XCTAssertTrue(sheet.buttons["Save Bookmark"].waitForExistence(timeout: 5))
+        // Let the fetch finish; product detection must not switch it back on.
+        _ = waitForText(in: sheet, containing: "Outsunny", timeout: 25)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertTrue(sheet.buttons["Save Bookmark"].exists, "The fetch overrode the user's choice")
+        XCTAssertFalse(sheet.buttons["Save to Wishlist"].exists)
+        sheet.buttons["Cancel"].click()
+    }
+
+    // MARK: - Library
+
+    @MainActor
+    func testDeleteAndUndo() throws {
+        launch()
+        let title = window.staticTexts.matching(titlePredicate("SwiftUI by Example")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10), window.debugDescription)
+        title.click()
+        app.typeKey(.delete, modifierFlags: .command)
+        XCTAssertTrue(title.waitForNonExistence(timeout: 5), "⌘⌫ didn't delete the selected card")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "⌘Z didn't bring the card back")
+    }
+
+    @MainActor
+    func testSearch() throws {
+        launch()
+        selectSidebar("All")
+        app.typeKey("f", modifierFlags: .command)
+        app.typeText("jazz")
+        XCTAssertTrue(waitForText(in: window, containing: "Miles Davis", timeout: 5), "Search didn't find the jazz bookmark")
+        XCTAssertTrue(waitUntil(timeout: 5) { !self.hasText(in: self.window, containing: "Figma") }, "Unrelated bookmarks still showing")
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey(.delete, modifierFlags: [])
+        XCTAssertTrue(waitForText(in: window, containing: "Figma", timeout: 5), "Clearing the search didn't bring everything back")
+    }
+
+    @MainActor
+    func testSettingsTabs() throws {
+        launch()
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows.matching(NSPredicate(format: "identifier CONTAINS[c] 'settings' OR title IN %@", ["General", "Display", "Tags", "Sync"])).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        for tab in ["Display", "Tags", "Sync", "General"] {
+            let button = app.toolbars.buttons[tab].exists ? app.toolbars.buttons[tab] : app.buttons[tab]
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "No \(tab) tab")
+            button.click()
+        }
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    @MainActor
+    func testKeyboardAndReader() throws {
+        launch()
+        selectSidebar("All")
+        let title = window.staticTexts.matching(titlePredicate("Figma")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.click()
+        for key in [XCUIKeyboardKey.downArrow, .rightArrow, .downArrow, .leftArrow, .upArrow] {
+            app.typeKey(key, modifierFlags: [])
+        }
+        app.typeKey(.space, modifierFlags: [])        // reader for the selected bookmark
+        RunLoop.current.run(until: Date().addingTimeInterval(4))
+        app.typeKey(.escape, modifierFlags: [])       // close the reader
+        app.typeKey(.escape, modifierFlags: [])       // clear the selection
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertTrue(window.exists)
+    }
+
+    @MainActor
+    func testLongMasonryLoadsMoreCards() throws {
+        launch(["-stressItems", "1000"])
+        selectSidebar("All")
+        app.typeKey("1", modifierFlags: .command)
+        // Without batch loading at most 150 different cards could ever appear (the first batch).
+        let firstScreen = visibleItems()
+        XCTAssertFalse(firstScreen.isEmpty, window.debugDescription)
+        var seen = firstScreen
+        let point = window.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.55))
+        var scrolls = 0
+        while seen.count < 400 && scrolls < 80 {
+            point.scroll(byDeltaX: 0, deltaY: -1500)
+            seen.formUnion(visibleItems())
+            scrolls += 1
+        }
+        XCTAssertGreaterThanOrEqual(seen.count, 400, "Only \(seen.count) different cards after \(scrolls) scrolls — batches didn't load")
+        // Back to the top: the first cards are there again.
+        for _ in 0..<(scrolls + 5) { point.scroll(byDeltaX: 0, deltaY: 6000) }
+        XCTAssertFalse(visibleItems().isDisjoint(with: firstScreen), "Scrolling back up didn't return to the first cards")
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// Stress items are titled "<number> …"; card dates ("20 Oct 2026") are ignored. Read from
+    /// one snapshot — lazy cards come and go while scrolling, so element-by-element reads race.
+    private func visibleItems() -> Set<Int> {
+        guard let root = try? window.snapshot() else { return [] }
+        let date = try? NSRegularExpression(pattern: #"^\d+ [A-Z][a-z]{2} \d{4}$"#)
+        var items = Set<Int>()
+        func walk(_ node: XCUIElementSnapshot) {
+            if node.elementType == .staticText, let text = node.value as? String, let first = text.first, first.isNumber,
+               date?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) == nil,
+               let number = Int(text.prefix(while: \.isNumber)) {
+                items.insert(number)
+            }
+            node.children.forEach(walk)
+        }
+        walk(root)
+        return items
+    }
+
+    // MARK: - Helpers
+
+    /// Pastes like a user would (typing drops characters such as ":" on some keyboard layouts).
+    /// The user's clipboard is restored afterwards.
+    private func paste(_ text: String, into field: XCUIElement) {
+        let pasteboard = NSPasteboard.general
+        let saved = pasteboard.string(forType: .string)
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        field.click()
+        app.typeKey("v", modifierFlags: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        pasteboard.clearContents()
+        if let saved { pasteboard.setString(saved, forType: .string) }
+    }
+
+    /// Card titles expose their text as the element's value, not its label.
+    private func titlePredicate(_ prefix: String) -> NSPredicate {
+        NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", prefix, prefix)
+    }
+
+    private func openCapture() -> XCUIElement {
+        app.typeKey("t", modifierFlags: .command)
+        let sheet = window.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "⌘T didn't open capture")
+        return sheet
+    }
+
+    private func selectSidebar(_ name: String) {
+        let texts = app.outlines.firstMatch.staticTexts
+        guard let index = texts.allElementsBoundByIndex.firstIndex(where: {
+            ($0.label.isEmpty ? ($0.value as? String ?? "") : $0.label) == name
+        }) else { return XCTFail("\(name) not in the sidebar") }
+        texts.element(boundBy: index).click()
+    }
+
+    private func hasText(in element: XCUIElement, containing text: String) -> Bool {
+        let predicate = NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", text, text)
+        return element.staticTexts.matching(predicate).firstMatch.exists
+            || element.textFields.matching(predicate).firstMatch.exists
+    }
+
+    private func waitForText(in element: XCUIElement, containing text: String, timeout: TimeInterval) -> Bool {
+        waitUntil(timeout: timeout) { self.hasText(in: element, containing: text) }
+    }
+
+    private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        return condition()
     }
 }
