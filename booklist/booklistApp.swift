@@ -166,7 +166,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        guard SyncService.isEnabled, let container = modelContainer else { return }
+        guard let container = modelContainer else { return }
+        if !LaunchMode.isUITesting {
+            BackupService.backupIfDue(context: container.mainContext)
+        }
+        guard SyncService.isEnabled else { return }
         try? SyncService.export(context: container.mainContext)
     }
 }
@@ -263,6 +267,8 @@ private struct MenuBarIcon: View {
 /// switched off, so a test run can never touch the real library or overwrite the sync file.
 nonisolated enum LaunchMode {
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
+    /// The app is hosting unit tests — no modal prompts at launch.
+    static let isHostingTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     /// `-stressItems 3000` (UI tests only): fill the in-memory store with a large library.
     static let stressItems = isUITesting ? UserDefaults.standard.integer(forKey: "stressItems") : 0
 }
@@ -274,16 +280,29 @@ struct booklistApp: App {
 
     private static var didRunLaunchTasks = false
 
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Bookmark.self,
-            Folder.self,
-            Tag.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: LaunchMode.isUITesting)
+    static let schema = Schema([
+        Bookmark.self,
+        Folder.self,
+        Tag.self,
+    ])
 
+    /// groupContainer: .none pins the store to the app's own container. With the default
+    /// (.automatic) SwiftData silently moves it into an App Group's container whenever the
+    /// app has one — betas ≤ 1.2 (2) did, see LibraryRecovery. Covered by ReleaseSafetyTests.
+    static func storeConfiguration(inMemory: Bool) -> ModelConfiguration {
+        ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory, groupContainer: .none)
+    }
+
+    var sharedModelContainer: ModelContainer = {
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            #if DEBUG
+            if LaunchMode.isUITesting, let profileLibrary = ProfileDriver.libraryCopyURL {
+                return try ModelContainer(for: booklistApp.schema,
+                                          configurations: [ModelConfiguration(schema: booklistApp.schema, url: profileLibrary)])
+            }
+            #endif
+            return try ModelContainer(for: booklistApp.schema,
+                                      configurations: [booklistApp.storeConfiguration(inMemory: LaunchMode.isUITesting)])
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -302,6 +321,10 @@ struct booklistApp: App {
                     Self.didRunLaunchTasks = true
                     // Give the delegate a reference so it can export on quit.
                     appDelegate.modelContainer = sharedModelContainer
+                    // Daily backup before anything at launch can change the library.
+                    if !LaunchMode.isUITesting {
+                        BackupService.backupIfDue(context: sharedModelContainer.mainContext)
+                    }
                     // Import from sync file on launch if enabled and a newer snapshot exists.
                     if SyncService.isEnabled {
                         _ = try? SyncService.importIfNewer(context: sharedModelContainer.mainContext)
@@ -325,6 +348,10 @@ struct booklistApp: App {
                         let imageURLs = bookmarks.flatMap { $0.imageURLs + [$0.selectedImageURL].compactMap { $0 } }
                         await StorageCleanup.run(referencedImageFiles: StorageCleanup.referencedFiles(imageURLs))
                     }
+                    BackupFolderPrompt.runIfNeeded(context: context)
+                    #if DEBUG
+                    await ProfileDriver.run(context: context)
+                    #endif
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -335,6 +362,14 @@ struct booklistApp: App {
                 ShowMainWindowButton(title: "Save Link…", appDelegate: appDelegate, thenCapture: true)
             }
             LibraryCommands()
+            CommandGroup(after: .importExport) {
+                Button("Restore from Backup…") {
+                    BackupService.runRestoreInteractively(into: sharedModelContainer.mainContext)
+                }
+                Button("Recover Library from Earlier Beta…") {
+                    LibraryRecovery.runInteractively(into: sharedModelContainer.mainContext)
+                }
+            }
         }
 
         MenuBarExtra {

@@ -105,6 +105,29 @@ Create folders as features are added — don't pre-create empty ones.
 
 ---
 
+## Releasing a beta
+
+A new beta must never lose a tester's library. Beta 1.2 (3) did (the App Group entitlement was
+removed, so SwiftData opened a new, empty store) — these steps exist so it can't happen again.
+
+1. **Never change without a rehearsal:** bundle ID, signing team, entitlements/capabilities, or
+   the data models (`Bookmark`, `Folder`, `Tag`). No capability that needs a provisioning profile
+   (App Groups, iCloud, Push, Associated Domains…) while betas use the free account.
+2. Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` on **all** targets.
+3. `RunAllTests` — `ReleaseSafetyTests` must pass: store location, entitlements, and opening the
+   library fixtures of earlier releases (`LibraryFixture_*`).
+4. Archive (Release) + export (`mac-application`), see the beta-distribution notes.
+5. `scripts/check-beta.sh <new booklist.app> <previous booklist.app>` — must say **OK to send**.
+6. **Rehearse the upgrade** whenever step 5 reports a change, or the data models changed:
+   install the *previous* beta in /Applications, open it and note the bookmark count, quit;
+   install the new one, open it — same count, same folders, images present. Backups
+   (File › Restore from Backup…) are the safety net while rehearsing.
+7. If the data models changed: add a new `LibraryFixture_<version>` (generated from the new
+   models) and a test that opens it. Never regenerate an existing fixture.
+8. Tester message: install steps + remind them to set up the backup folder (the app asks once).
+
+---
+
 ## Current State
 
 _Last updated: 2026-04-28_
@@ -182,5 +205,9 @@ Core app is functional. All foundation phases are complete.
 | 2026-10-20 | Bulk move/tag change relationships from the folder/tag side in one batch (`BookmarkBulkActions`) | Per-bookmark assignment updates the inverse array each time — quadratic: 5,000 items took ~9 s each for move and tag, now ~0.4 s / ~0.05 s |
 | 2026-10-20 | `StorageCleanup` at launch (skipped with `-uiTesting`): deletes `CFNetworkDownload_*.tmp` leftovers and saved images no bookmark references, both only if older than 24 h | A real install had 705 MB of download temp files left by older builds and 40% of saved images orphaned (deleted bookmarks, unchosen capture candidates). The grace period protects captures/imports in progress |
 | 2026-10-20 | Stress tooling: `StressTests` (5,000-item data layer) in the normal suite; `StressUITests` + `StressData` (`-uiTesting -stressItems N`, DEBUG only, images in tmp) opt-in. UI-test timings in List view are an XCUITest artifact (its accessibility snapshot builds every table row) — measure real performance by launching the app directly and using `footprint` | Repeatable heavy-usage checks without touching the user's library |
+| 2026-10-22 | Removed the unused App Groups entitlement (`group.lepi.booklist`) from the app and the share extension. **Don't add capabilities that need a provisioning profile** (App Groups, iCloud, Push, Associated Domains…) while betas are signed with the free account | Beta 1.2 (2) was killed on a tester's Mac at launch ("Code Signature Invalid / Taskgated"): `group.`-prefixed app groups need a profile, and free-account profiles only list the developer's own Mac. Nothing used the group — the share extension hands links over via the `booklist://` URL scheme. Without it no profile is embedded and the build runs on other Macs after "Open Anyway" |
+| 2026-10-22 | Store pinned to the app container (`ModelConfiguration(groupContainer: .none)`); **File › Recover Library from Earlier Beta…** (`LibraryRecovery`) merges the old App-Group store into the current library; `StorageCleanup` refuses to delete images when the library is empty or most images look orphaned | With an App Group entitlement SwiftData silently stores the library in the group container — every beta ≤ 1.2 (2) did. Removing the entitlement made 1.2 (3) open an empty store (testers "lost" everything), and the launch cleanup then deleted all saved images as orphans. The sandbox only reaches the old folder through an open panel; the store is copied and read from the copy, merged by ID (tags also by name), and missing local images fall back to the page's web image |
+| 2026-10-22 | Three layers so an update can't lose the library: (1) `BackupService` — automatic local backups (launch, at most every 20 h, and on quit; newest 7; never of an empty library; one before every sync import) + File › Restore from Backup…; (2) `BackupFolderPrompt` — once per version until set up, asks for a sync folder outside the app (offers to merge a backup already in it); sync export refuses to replace a non-empty snapshot with an empty library; (3) release process — `ReleaseSafetyTests` (store location, entitlements, `LibraryFixture_1_2` opens), `scripts/check-beta.sh`, "Releasing a beta" checklist | Ivan: losing data on a beta update is unacceptable. Local backups cover a moved/empty store; only a folder outside the container survives macOS replacing the container (the tester's case); the checks catch the cause before a build ships — check-beta.sh flags exactly the 1.2 (3) entitlement change |
+| 2026-10-23 | Large-library performance, measured on a copy of a tester's 1,027-item library with `ProfileDriver` (DEBUG, `-uiTesting -profileLibrary -profileDriver`): (1) `ManagePanelView` edits a `Draft` (title, URL, note, price, thumbnail), saved 0.6 s after the last change and on close — typing 138 → 2–4 ms per character (274 → 2 ms after scrolling); (2) one library `@Query` in `ContentView`, passed to the sidebar and content area, **without a sort descriptor** (with unsaved changes SwiftData sorts in memory via slow key paths) — `filteredAndSorted` sorts with precomputed keys; (3) `ContentAreaView` memoizes the filtered list (`DisplayMemo`, invalidated by a new query array, selection, search, tags, sort) and filters by `appliedSearch` (0.15 s after typing) — search typing 57–135 → 16 ms per character; (4) `BookmarksExport` stores IDs and builds the export when shared | Tester: app "almost unusable", CPU 100 %, 46 s hang (spindump: main thread in lazy-stack view-list updates). Every bookmark write re-ran the whole window per keystroke. Remaining: each real change (save, tag, move, open link) still re-fetches the library (~140–220 ms on an M2) — replacing `@Query` with a self-maintained list was judged too risky (views reading deleted models) for now |
 | 2026-10-20 | UI test target `booklistUITests`, opt-in via `touch /tmp/booklist-run-ui-tests`; app launched with `-uiTesting` (in-memory store, sync off, window opened on launch) | UI tests drive the real mouse, so routine runs skip them; `-uiTesting` keeps the user's library and sync file untouched |
 | 2026-10-19 | Settings consolidated to 4 tabs: General (incl. currency), Display (cards + list columns), Tags, Sync | Fewer tabs = less hunting |

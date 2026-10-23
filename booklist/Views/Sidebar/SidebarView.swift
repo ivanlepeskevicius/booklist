@@ -3,8 +3,8 @@ import SwiftData
 
 struct SidebarView: View {
     @Binding var selection: SidebarSelection?
-
-    @Query private var allBookmarks: [Bookmark]
+    /// Owned by ContentView's single library query (see there) — not queried here.
+    let allBookmarks: [Bookmark]
     @Query(sort: \Folder.sortOrder) private var allFolders: [Folder]
 
     @Environment(\.modelContext) private var modelContext

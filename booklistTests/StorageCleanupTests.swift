@@ -47,16 +47,30 @@ struct StorageCleanupTests {
     func orphanedImages() throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(at: dir) }
-        let kept = try file("AAAA.jpg", in: dir, modified: old)
+        let kept = try ["AAAA.jpg", "DDDD.jpg", "EEEE.jpg"].map { try file($0, in: dir, modified: old) }
         try file("BBBB.jpg", in: dir, modified: old)      // orphan, old → removed
         try file("CCCC.jpg", in: dir, modified: now)      // orphan, but maybe a capture in progress → kept
 
-        let referenced = StorageCleanup.referencedFiles([kept.absoluteString, "https://example.com/remote.jpg"])
+        let referenced = StorageCleanup.referencedFiles(kept.map(\.absoluteString) + ["https://example.com/remote.jpg"])
         StorageCleanup.removeOrphanedImages(in: dir, keeping: referenced, now: now)
 
-        #expect(exists("AAAA.jpg", in: dir))
+        #expect(["AAAA.jpg", "DDDD.jpg", "EEEE.jpg"].allSatisfy { exists($0, in: dir) })
         #expect(!exists("BBBB.jpg", in: dir))
         #expect(exists("CCCC.jpg", in: dir))
+    }
+
+    @Test("Nothing is removed when the library is empty or most images look orphaned (moved/missing database)")
+    func refusesMassDeletion() throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let images = try (0..<10).map { try file("IMG\($0).jpg", in: dir, modified: old) }
+
+        // Empty library: every image looks orphaned.
+        #expect(StorageCleanup.removeOrphanedImages(in: dir, keeping: [], now: now) == 0)
+        // Library that only knows 2 of 10 images (e.g. sample data in a fresh store).
+        let few = StorageCleanup.referencedFiles(images.prefix(2).map(\.absoluteString))
+        #expect(StorageCleanup.removeOrphanedImages(in: dir, keeping: few, now: now) == 0)
+        #expect(images.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
     }
 
     @Test("Only local file URLs count as referenced images")

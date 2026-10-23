@@ -342,6 +342,28 @@ final class UserFlowUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5), "⌘Z didn't bring the card back")
     }
 
+    /// The edit panel edits a draft and saves it after a pause and on Done — the note must still
+    /// end up on the bookmark, and typing must not be lost when Done is pressed right away.
+    @MainActor
+    func testEditNoteIsSaved() throws {
+        launch()
+        let title = window.staticTexts.matching(titlePredicate("SwiftUI by Example")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.rightClick()
+        app.menuItems["Edit"].click()
+        let sheet = window.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Edit panel didn't open")
+        let note = sheet.textViews.firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 5), sheet.debugDescription)
+        note.click()
+        app.typeKey("a", modifierFlags: .command)
+        note.typeText("Saved from the draft")
+        sheet.buttons["Done"].click()       // straight away — before the 0.6 s autosave
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(waitForText(in: window, containing: "Saved from the draft", timeout: 5),
+                      "The edited note isn't on the card")
+    }
+
     @MainActor
     func testSearch() throws {
         launch()

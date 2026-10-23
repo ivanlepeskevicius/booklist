@@ -30,8 +30,14 @@ nonisolated enum StorageCleanup {
         remove(in: directory, now: now) { $0.hasPrefix("CFNetworkDownload_") && $0.hasSuffix(".tmp") }
     }
 
+    /// Skipped entirely when most images look orphaned: that means the library itself is missing
+    /// or empty (e.g. the database moved — beta 1.2 (3) opened a fresh store after the App Group
+    /// was removed), not that the user deleted most of their bookmarks.
     static func removeOrphanedImages(in directory: URL, keeping referenced: Set<String>, now: Date) -> Int {
-        remove(in: directory, now: now) { !referenced.contains($0) }
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        let orphans = files.filter { !referenced.contains($0) }
+        guard !referenced.isEmpty, orphans.count * 2 <= files.count else { return 0 }
+        return remove(in: directory, now: now) { !referenced.contains($0) }
     }
 
     private static func remove(in directory: URL, now: Date, where shouldRemove: (String) -> Bool) -> Int {

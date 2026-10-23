@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import CoreTransferable
 import UniformTypeIdentifiers
 
@@ -120,18 +121,31 @@ struct ExportService {
 // MARK: - Transferable wrapper for ShareLink
 
 struct BookmarksExport: Transferable {
-    let items: [ExportService.ExportItem]
+    let ids: [PersistentIdentifier]
+    let container: ModelContainer?
     let title: String
 
-    /// Snapshot the bookmarks eagerly so the Transferable closure runs off the main actor safely.
+    /// Keeps only the bookmarks' IDs; the export itself is built when the user actually shares.
+    /// Building it here made every redraw of a share button walk the whole visible list
+    /// (measured: a large share of each update on a 1,027-item library). The models are read on
+    /// the main actor inside the export closure, so SwiftData is never touched off it.
     init(bookmarks: [Bookmark], title: String) {
-        self.items = ExportService.makeExportItems(from: bookmarks)
+        self.ids = bookmarks.map(\.persistentModelID)
+        self.container = bookmarks.first?.modelContext?.container
         self.title = title
+    }
+
+    @MainActor
+    func makeItems() -> [ExportService.ExportItem] {
+        guard let context = container?.mainContext else { return [] }
+        let bookmarks = ids.compactMap { context.model(for: $0) as? Bookmark }
+        return ExportService.makeExportItems(from: bookmarks)
     }
 
     static var transferRepresentation: some TransferRepresentation {
         DataRepresentation(exportedContentType: .html) { export in
-            let html = ExportService.generateHTML(items: export.items, title: export.title)
+            let items = await export.makeItems()
+            let html = ExportService.generateHTML(items: items, title: export.title)
             return Data(html.utf8)
         }
     }

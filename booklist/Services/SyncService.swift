@@ -79,12 +79,17 @@ struct SyncService {
         defer { if secured { folderURL.stopAccessingSecurityScopedResource() } }
 
         let syncData = try buildSnapshot(context: context)
+        let fileURL  = folderURL.appendingPathComponent(syncFileName)
+        let existing = try? BackupService.read(fileURL)
+        guard mayOverwrite(existingBookmarkCount: existing?.bookmarks.count, newBookmarkCount: syncData.bookmarks.count)
+        else { throw SyncError.wouldEraseBackup }
+
         let encoder  = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting     = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(syncData)
 
-        try data.write(to: folderURL.appendingPathComponent(syncFileName), options: .atomic)
+        try data.write(to: fileURL, options: .atomic)
         lastSyncDate = syncData.exportedAt
     }
 
@@ -108,6 +113,8 @@ struct SyncService {
         // Skip if our local copy is already at or ahead of the file
         if let last = lastSyncDate, syncData.exportedAt <= last { return false }
 
+        // Importing replaces the whole library — keep a backup of what's being replaced.
+        BackupService.backUp(context: context)
         try restore(syncData: syncData, context: context)
         lastSyncDate = syncData.exportedAt
         return true
@@ -244,12 +251,21 @@ struct SyncService {
 
     enum SyncError: LocalizedError {
         case noSyncFolder
+        case wouldEraseBackup
 
         var errorDescription: String? {
             switch self {
             case .noSyncFolder:
                 return "No sync folder configured. Choose one in Settings → Sync."
+            case .wouldEraseBackup:
+                return "Your library is empty, so it wasn't saved over the backup in your sync folder."
             }
         }
+    }
+
+    /// An empty library never replaces a snapshot that has bookmarks: an empty library on launch
+    /// means something went wrong (see beta 1.2 (3)), and the sync file may be the only good copy.
+    nonisolated static func mayOverwrite(existingBookmarkCount: Int?, newBookmarkCount: Int) -> Bool {
+        newBookmarkCount > 0 || (existingBookmarkCount ?? 0) == 0
     }
 }

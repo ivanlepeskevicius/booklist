@@ -119,6 +119,13 @@ nonisolated enum CardSize: CaseIterable {
 
 struct ContentView: View {
     @State private var selection: SidebarSelection? = .inbox
+    /// The one query of the whole library, shared by the sidebar and the content area. Every
+    /// change to any bookmark makes a @Query re-load all of them; with a query in each view that
+    /// happened twice per change (measured: ~85% of each change's cost on a 1,027-item library).
+    /// Passed down as a plain array, each view also only refreshes when a property it reads changes.
+    /// No sort descriptor: with unsaved changes SwiftData sorts the whole library in memory through
+    /// slow key-path reads (half of each change's cost) — ContentAreaView sorts what it shows instead.
+    @Query private var allBookmarks: [Bookmark]
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @Environment(\.modelContext) private var modelContext
     @Environment(\.undoManager) private var undoManager
@@ -133,9 +140,9 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $selection)
+            SidebarView(selection: $selection, allBookmarks: allBookmarks)
         } detail: {
-            ContentAreaView(selection: selection ?? .inbox)
+            ContentAreaView(selection: selection ?? .inbox, allBookmarks: allBookmarks)
         }
         .navigationSplitViewStyle(.balanced)
         .preferredColorScheme(preferredColorScheme)
@@ -143,6 +150,14 @@ struct ContentView: View {
         // shortcut isn't available — bind the window's undo manager manually so Edit › Undo
         // (⌘Z) reverts SwiftData changes such as deletes and moves.
         .onAppear { modelContext.undoManager = undoManager }
+        #if DEBUG
+        .task {
+            guard ProfileDriver.isEnabled else { return }
+            for await note in NotificationCenter.default.notifications(named: ProfileDriver.selectNotification) {
+                if let target = note.object as? SidebarSelection { selection = target }
+            }
+        }
+        #endif
     }
 }
 

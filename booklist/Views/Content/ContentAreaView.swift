@@ -3,8 +3,9 @@ import SwiftData
 
 struct ContentAreaView: View {
     let selection: SidebarSelection
-
-    @Query(sort: \Bookmark.dateAdded, order: .reverse) private var allBookmarks: [Bookmark]
+    /// Unsorted (sorting happens in `filteredAndSorted`). Owned by ContentView's single library
+    /// query (see there) — not queried here.
+    let allBookmarks: [Bookmark]
     @Query private var allFolders: [Folder]
     @Query(sort: \Tag.name) private var allTags: [Tag]
 
@@ -25,6 +26,10 @@ struct ContentAreaView: View {
     @State private var selectedTagIDs: Set<UUID>      = []
     /// Changes each time the user picks "Random", producing a new stable shuffle order.
     @State private var shuffleNonce        = 0
+    /// `searchText` as it was 0.15 s after the last keystroke — what the list is filtered by, so
+    /// typing doesn't refilter the whole library on every key.
+    @State private var appliedSearch       = ""
+    @State private var displayMemo         = DisplayMemo()
 
     @FocusState private var isSearchFocused: Bool
 
@@ -67,10 +72,6 @@ struct ContentAreaView: View {
         }
     }
 
-    private var displayedBookmarks: [Bookmark] {
-        filteredAndSorted(scopedBookmarks)
-    }
-
     private func filteredAndSorted(_ scoped: [Bookmark]) -> [Bookmark] {
         var result = scoped
 
@@ -82,8 +83,8 @@ struct ContentAreaView: View {
         }
 
         // Filter by search text. Tags are shown as "#name", so a leading "#" is ignored for tag matching.
-        if !searchText.isEmpty {
-            let q = searchText.lowercased()
+        if !appliedSearch.isEmpty {
+            let q = appliedSearch.lowercased()
             let tagQuery = q.hasPrefix("#") ? String(q.dropFirst()) : q
             result = result.filter {
                 $0.title.lowercased().contains(q) ||
@@ -94,32 +95,77 @@ struct ContentAreaView: View {
             }
         }
 
-        // 4. Apply sort
+        // 4. Apply sort. Each bookmark's sort key is read once up front: reading a SwiftData
+        // property is slow enough that reading it inside the comparator (~20,000 times for
+        // 1,000 items) showed up in profiles.
         switch sortOption {
-        case .recent:       break
+        case .recent:
+            result = result.map { ($0.dateAdded, $0) }.sorted { $0.0 > $1.0 }.map(\.1)
         case .lastOpened:
             // Most recently opened first; never-opened items sink to the bottom,
             // ordered by date added among themselves.
-            result.sort { a, b in
-                switch (a.lastOpenedDate, b.lastOpenedDate) {
-                case (let d1?, let d2?): return d1 > d2
-                case (_?, nil):         return true
-                case (nil, _?):         return false
-                case (nil, nil):        return a.dateAdded > b.dateAdded
+            result = result.map { (opened: $0.lastOpenedDate, added: $0.dateAdded, bookmark: $0) }
+                .sorted { a, b in
+                    switch (a.opened, b.opened) {
+                    case (let d1?, let d2?): return d1 > d2
+                    case (_?, nil):         return true
+                    case (nil, _?):         return false
+                    case (nil, nil):        return a.added > b.added
+                    }
                 }
-            }
-        case .alphabetical: result.sort { $0.title.localizedCompare($1.title) == .orderedAscending }
+                .map(\.bookmark)
+        case .alphabetical:
+            result = result.map { ($0.title, $0) }
+                .sorted { $0.0.localizedCompare($1.0) == .orderedAscending }
+                .map(\.1)
         case .random:
             // Stable hash-based shuffle: same nonce → same order every render.
             // shuffleNonce is bumped each time the user picks "Random".
-            result.sort { a, b in
-                var h0 = Hasher(); h0.combine(a.id); h0.combine(shuffleNonce)
-                var h1 = Hasher(); h1.combine(b.id); h1.combine(shuffleNonce)
-                return h0.finalize() < h1.finalize()
+            result = result.map { bookmark -> (Int, Bookmark) in
+                var hasher = Hasher(); hasher.combine(bookmark.id); hasher.combine(shuffleNonce)
+                return (hasher.finalize(), bookmark)
             }
+            .sorted { $0.0 < $1.0 }
+            .map(\.1)
         }
 
         return result
+    }
+
+    // MARK: - Memo
+
+    /// The filtered, sorted list and the tags in view, kept until something they depend on changes.
+    /// The body runs for many reasons (selection, hover state, sheets, every search keystroke);
+    /// re-filtering 1,000+ bookmarks each time made the app sluggish on large libraries.
+    /// Any change to the library gives `allBookmarks` a new array (the query re-fetches), so a
+    /// different array buffer invalidates the memo — edits are never shown stale.
+    final class DisplayMemo {
+        struct Key: Equatable {
+            var library: UnsafeRawPointer?, count: Int
+            var folders: UnsafeRawPointer?
+            var selection: SidebarSelection, search: String, tags: Set<UUID>
+            var sort: SortOption, nonce: Int
+        }
+        var key: Key?
+        var bookmarks: [Bookmark] = []
+        var tagIDs: Set<UUID> = []
+    }
+
+    private func displayed() -> (bookmarks: [Bookmark], tagIDs: Set<UUID>) {
+        let key = DisplayMemo.Key(
+            library: allBookmarks.withUnsafeBufferPointer { UnsafeRawPointer($0.baseAddress) },
+            count: allBookmarks.count,
+            folders: allFolders.withUnsafeBufferPointer { UnsafeRawPointer($0.baseAddress) },
+            selection: selection, search: appliedSearch, tags: selectedTagIDs,
+            sort: sortOption, nonce: shuffleNonce
+        )
+        if displayMemo.key != key {
+            let scoped = scopedBookmarks
+            displayMemo.bookmarks = filteredAndSorted(scoped)
+            displayMemo.tagIDs = Set(scoped.flatMap { $0.tags.map(\.id) })
+            displayMemo.key = key
+        }
+        return (displayMemo.bookmarks, displayMemo.tagIDs)
     }
 
     // MARK: - Body
@@ -127,10 +173,8 @@ struct ContentAreaView: View {
     var body: some View {
         // Filtering + sorting is computed once per render and shared below,
         // rather than re-running for every place that needs the list.
-        let scoped = scopedBookmarks
-        let bookmarks = filteredAndSorted(scoped)
+        let (bookmarks, scopedTagIDs) = displayed()
         // Only offer tags that exist in this view (plus any still selected), so no chip leads nowhere.
-        let scopedTagIDs = Set(scoped.flatMap { $0.tags.map(\.id) })
         let visibleTags = allTags.filter { scopedTagIDs.contains($0.id) || selectedTagIDs.contains($0.id) }
 
         HStack(spacing: 0) {
@@ -168,6 +212,14 @@ struct ContentAreaView: View {
         .background { keyboardShortcuts(for: bookmarks) }
         .navigationTitle(navigationTitle)
         .searchable(text: $searchText, prompt: "Search \(navigationTitle)")
+        .task(id: searchText) {
+            // Clearing applies at once; typing applies after a short pause.
+            if !searchText.isEmpty {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+            }
+            appliedSearch = searchText
+        }
         .searchFocused($isSearchFocused)
         // Lets File › Import Bookmarks… open the import sheet in this window.
         .focusedSceneValue(\.showingImport, $showingImport)
@@ -220,6 +272,20 @@ struct ContentAreaView: View {
         .sheet(item: $managingBookmark) { bookmark in
             ManagePanelView(bookmark: bookmark)
         }
+        #if DEBUG
+        .task {
+            guard ProfileDriver.isEnabled else { return }
+            for await note in NotificationCenter.default.notifications(named: ProfileDriver.manageNotification) {
+                if let id = note.object as? UUID { managingBookmark = allBookmarks.first { $0.id == id } }
+            }
+        }
+        .task {
+            guard ProfileDriver.isEnabled else { return }
+            for await note in NotificationCenter.default.notifications(named: ProfileDriver.selectCardsNotification) {
+                if let ids = note.object as? Set<UUID> { selectedBookmarkIDs = ids }
+            }
+        }
+        #endif
         .sheet(isPresented: $showingCapture, onDismiss: {
             captureRouter.pendingURL   = nil
             captureRouter.pendingTitle = nil
@@ -256,7 +322,7 @@ struct ContentAreaView: View {
             guard readerBookmark != nil,
                   newIDs.count == 1,
                   let id = newIDs.first,
-                  let bm = displayedBookmarks.first(where: { $0.id == id }) else { return }
+                  let bm = displayed().bookmarks.first(where: { $0.id == id }) else { return }
             readerBookmark = bm
         }
         // Auto-open capture when a URL arrives from the Share Extension / deep link.

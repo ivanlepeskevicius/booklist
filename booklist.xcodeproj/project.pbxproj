@@ -13,6 +13,10 @@
 		1714162C3087B69800517B3B /* WishlistSitesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1714162B3087B69800517B3B /* WishlistSitesTests.swift */; };
 		171416303087BC7700517B3B /* StressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1714162F3087BC7700517B3B /* StressTests.swift */; };
 		171416343087C98600517B3B /* StorageCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171416333087C98600517B3B /* StorageCleanupTests.swift */; };
+		17141726308A776700517B3B /* LibraryRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17141725308A776700517B3B /* LibraryRecoveryTests.swift */; };
+		171417A5308A7FD200517B3B /* LibraryFixture_1_2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171417A4308A7FD200517B3B /* LibraryFixture_1_2.swift */; };
+		171417A7308A7FE600517B3B /* ReleaseSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171417A6308A7FE600517B3B /* ReleaseSafetyTests.swift */; };
+		171417A9308A7FF800517B3B /* BackupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171417A8308A7FF800517B3B /* BackupServiceTests.swift */; };
 		178314BA2F97650300922140 /* booklist share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 178314AE2F97650300922140 /* booklist share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		178E71452FB70B0C002D66E9 /* FolderTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178E71442FB70B0C002D66E9 /* FolderTreeTests.swift */; };
 		178E71492FB7DBD4002D66E9 /* MasonryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178E71482FB7DBD4002D66E9 /* MasonryTests.swift */; };
@@ -71,6 +75,10 @@
 		1714162B3087B69800517B3B /* WishlistSitesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistSitesTests.swift; sourceTree = "<group>"; };
 		1714162F3087BC7700517B3B /* StressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTests.swift; sourceTree = "<group>"; };
 		171416333087C98600517B3B /* StorageCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageCleanupTests.swift; sourceTree = "<group>"; };
+		17141725308A776700517B3B /* LibraryRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryRecoveryTests.swift; sourceTree = "<group>"; };
+		171417A4308A7FD200517B3B /* LibraryFixture_1_2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFixture_1_2.swift; sourceTree = "<group>"; };
+		171417A6308A7FE600517B3B /* ReleaseSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseSafetyTests.swift; sourceTree = "<group>"; };
+		171417A8308A7FF800517B3B /* BackupServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupServiceTests.swift; sourceTree = "<group>"; };
 		1783145A2F94F46300922140 /* booklist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = booklist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314AE2F97650300922140 /* booklist share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "booklist share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314D92FA153BE00922140 /* booklistTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = booklistTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -224,6 +232,10 @@
 				1714162B3087B69800517B3B /* WishlistSitesTests.swift */,
 				1714162F3087BC7700517B3B /* StressTests.swift */,
 				171416333087C98600517B3B /* StorageCleanupTests.swift */,
+				17141725308A776700517B3B /* LibraryRecoveryTests.swift */,
+				171417A4308A7FD200517B3B /* LibraryFixture_1_2.swift */,
+				171417A6308A7FE600517B3B /* ReleaseSafetyTests.swift */,
+				171417A8308A7FF800517B3B /* BackupServiceTests.swift */,
 			);
 			path = booklistTests;
 			sourceTree = "<group>";
@@ -420,6 +432,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				171417A5308A7FD200517B3B /* LibraryFixture_1_2.swift in Sources */,
 				AA22000000000001AABB0001 /* booklistTests.swift in Sources */,
 				178E71492FB7DBD4002D66E9 /* MasonryTests.swift in Sources */,
 				17141628308754DE00517B3B /* AmazonParsingTests.swift in Sources */,
@@ -428,8 +441,10 @@
 				AA22000000000003AABB0003 /* ColorHexTests.swift in Sources */,
 				AA22000000000004AABB0004 /* ExportServiceTests.swift in Sources */,
 				AA22000000000005AABB0005 /* ImportServiceTests.swift in Sources */,
+				171417A9308A7FF800517B3B /* BackupServiceTests.swift in Sources */,
 				17DB62EA3086333A0090B616 /* PriceFormatterTests.swift in Sources */,
 				17DB62F330866DF20090B616 /* IconCatalogTests.swift in Sources */,
+				17141726308A776700517B3B /* LibraryRecoveryTests.swift in Sources */,
 				1714162A3087598B00517B3B /* ShopPriceTests.swift in Sources */,
 				1714162630874F4800517B3B /* RedditOEmbedTests.swift in Sources */,
 				178E71452FB70B0C002D66E9 /* FolderTreeTests.swift in Sources */,
@@ -439,6 +454,7 @@
 				AA22000000000008AABB0008 /* SyncDataTests.swift in Sources */,
 				1714162C3087B69800517B3B /* WishlistSitesTests.swift in Sources */,
 				171416343087C98600517B3B /* StorageCleanupTests.swift in Sources */,
+				171417A7308A7FE600517B3B /* ReleaseSafetyTests.swift in Sources */,
 				AA22000000000009AABB0009 /* SyncServiceRestoreTests.swift in Sources */,
 				171416303087BC7700517B3B /* StressTests.swift in Sources */,
 				AA2200000000000AAABB000A /* XCTestBridge.swift in Sources */,
@@ -602,7 +618,7 @@
 				CODE_SIGN_ENTITLEMENTS = booklist/booklist.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -624,7 +640,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -645,7 +661,7 @@
 				CODE_SIGN_ENTITLEMENTS = booklist/booklist.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -667,7 +683,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -686,7 +702,7 @@
 				CODE_SIGN_ENTITLEMENTS = "booklist share/booklist share.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -699,7 +715,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "lepi.booklist.booklist-share";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -718,7 +734,7 @@
 				CODE_SIGN_ENTITLEMENTS = "booklist share/booklist share.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -731,7 +747,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "lepi.booklist.booklist-share";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -749,10 +765,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklist.booklistTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -769,10 +785,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklist.booklistTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -788,11 +804,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklistUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -811,11 +827,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = lepi.booklistUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

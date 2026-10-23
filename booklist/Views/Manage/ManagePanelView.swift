@@ -2,6 +2,11 @@ import SwiftUI
 import SwiftData
 
 /// Sheet that lets the user view and edit all details of a saved bookmark.
+///
+/// Text fields and the thumbnail choice edit a `Draft`, saved to the bookmark 0.6 s after the user
+/// stops typing and when the panel closes. Writing to the bookmark on every keystroke made every
+/// view that shows the library recompute (measured on a tester's 1,027-item library: 138 ms per
+/// typed character, 274 ms after scrolling masonry to the end — the app fell behind and hung).
 struct ManagePanelView: View {
     @Bindable var bookmark: Bookmark
     @Environment(\.dismiss) private var dismiss
@@ -9,6 +14,30 @@ struct ManagePanelView: View {
     @Query(sort: \Folder.sortOrder) private var allFolders: [Folder]
 
     @State private var showingNewFolder = false
+    @State private var draft: Draft
+
+    /// The fields edited by typing or picking — everything else (folder, tags, type) is a single
+    /// click and is written straight to the bookmark.
+    struct Draft: Equatable {
+        var title: String
+        var url: String
+        var note: String
+        var price: String
+        var selectedImageURL: String?
+
+        init(_ bookmark: Bookmark) {
+            title = bookmark.title
+            url = bookmark.url
+            note = bookmark.note ?? ""
+            price = bookmark.price ?? ""
+            selectedImageURL = bookmark.selectedImageURL
+        }
+    }
+
+    init(bookmark: Bookmark) {
+        self.bookmark = bookmark
+        _draft = State(initialValue: Draft(bookmark))
+    }
 
     @AppStorage("preferredCurrency") private var preferredCurrency = Locale.current.currency?.identifier ?? "USD"
 
@@ -44,15 +73,23 @@ struct ManagePanelView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        if let raw = bookmark.price, !raw.isEmpty {
-                            bookmark.price = PriceFormatter.normalized(raw, symbol: currencySymbol)
+                        if !draft.price.isEmpty {
+                            draft.price = PriceFormatter.normalized(draft.price, symbol: currencySymbol)
                         }
+                        commit()
                         dismiss()
                     }
                 }
             }
         }
         .frame(minWidth: 420, minHeight: 480)
+        // Save shortly after the last change (the task restarts on every edit), and always on close.
+        .task(id: draft) {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            commit()
+        }
+        .onDisappear { commit() }
         .sheet(isPresented: $showingNewFolder) {
             FolderFormView(mode: .add(parentID: nil)) { newFolder in
                 bookmark.collection = newFolder
@@ -65,9 +102,9 @@ struct ManagePanelView: View {
     private var detailsGroup: some View {
         formGroup(title: "Details") {
             VStack(spacing: 0) {
-                rowField("Title", text: $bookmark.title)
+                rowField("Title", text: $draft.title)
                 rowDivider
-                rowField("URL", text: $bookmark.url)
+                rowField("URL", text: $draft.url)
                 if let desc = bookmark.pageDescription, !desc.isEmpty {
                     rowDivider
                     stackedField(label: "Description") {
@@ -80,13 +117,7 @@ struct ManagePanelView: View {
                 }
                 rowDivider
                 stackedField(label: "Note") {
-                    NoteEditor(
-                        text: Binding(
-                            get: { bookmark.note ?? "" },
-                            set: { bookmark.note = $0.isEmpty ? nil : $0 }
-                        ),
-                        placeholder: "Add a note…"
-                    )
+                    NoteEditor(text: $draft.note, placeholder: "Add a note…")
                     .frame(minHeight: 60, maxHeight: 160)
                 }
             }
@@ -158,10 +189,7 @@ struct ManagePanelView: View {
 
                 if bookmark.itemType == .wishlistItem {
                     rowDivider
-                    rowField("Price", text: Binding(
-                        get: { bookmark.price ?? "" },
-                        set: { bookmark.price = $0.isEmpty ? nil : $0 }
-                    ))
+                    rowField("Price", text: $draft.price)
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: bookmark.itemType)
@@ -174,10 +202,7 @@ struct ManagePanelView: View {
                 if !bookmark.imageURLs.isEmpty {
                     ImagePickerGrid(
                         imageURLs: bookmark.imageURLs,
-                        selectedURL: Binding(
-                            get: { bookmark.selectedImageURL },
-                            set: { bookmark.selectedImageURL = $0 }
-                        ),
+                        selectedURL: $draft.selectedImageURL,
                         scrollable: false
                     )
                 }
@@ -185,7 +210,7 @@ struct ManagePanelView: View {
                     if !bookmark.imageURLs.contains(savedURL) {
                         bookmark.imageURLs.append(savedURL)
                     }
-                    bookmark.selectedImageURL = savedURL
+                    draft.selectedImageURL = savedURL
                 }
             }
             .padding(10)
@@ -203,6 +228,20 @@ struct ManagePanelView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Saving
+
+    /// Writes only the fields that changed, so an unchanged draft doesn't touch the bookmark.
+    private func commit() {
+        guard bookmark.isAlive else { return }
+        if bookmark.title != draft.title { bookmark.title = draft.title }
+        if bookmark.url != draft.url { bookmark.url = draft.url }
+        let note = draft.note.isEmpty ? nil : draft.note
+        if bookmark.note != note { bookmark.note = note }
+        let price = draft.price.isEmpty ? nil : draft.price
+        if bookmark.price != price { bookmark.price = price }
+        if bookmark.selectedImageURL != draft.selectedImageURL { bookmark.selectedImageURL = draft.selectedImageURL }
     }
 
     // MARK: - Row helpers
