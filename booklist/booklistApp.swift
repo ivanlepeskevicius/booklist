@@ -337,6 +337,7 @@ struct booklistApp: App {
                         SampleData.populate(in: sharedModelContainer.mainContext)
                     }
                     #endif
+                    AmazonImageRepair.runIfNeeded(context: sharedModelContainer.mainContext)
                     // Launch-time imports aren't user actions — don't let ⌘Z revert them.
                     let context = sharedModelContainer.mainContext
                     try? context.save()

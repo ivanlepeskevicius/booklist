@@ -149,19 +149,23 @@ nonisolated struct MetadataFetcher {
             guard let raw,
                   let resolved = resolveURL(raw, baseURL: baseURL),
                   !images.contains(resolved) else { return }
-            // Amazon UI graphics (nav sprites, Prime badges) live under /images/G/;
-            // product photos are under /images/I/.
-            if isAmazon && resolved.contains("/images/G/") { return }
             images.append(resolved)
         }
-        if isAmazon { addImage(amazonMainImage(in: html)) }
-        addImage(ogMeta("og:image",         in: html))
-        addImage(ogMeta("og:image:url",     in: html))
-        addImage(namedMeta("twitter:image",     in: html))
-        addImage(namedMeta("twitter:image:src", in: html))
-        for src in imgSrcs(in: html) {
-            addImage(src)
-            if images.count >= 24 { break }
+        if isAmazon {
+            // Only the product's own photos. Everything else on an Amazon page — tiny gallery
+            // thumbnails, "From the manufacturer" banners, brand logos, Prime badges, other
+            // products — is noise in the image picker.
+            amazonGalleryImages(in: html).forEach(addImage)
+            if images.isEmpty { addImage(amazonMainImage(in: html)) }
+        } else {
+            addImage(ogMeta("og:image",         in: html))
+            addImage(ogMeta("og:image:url",     in: html))
+            addImage(namedMeta("twitter:image",     in: html))
+            addImage(namedMeta("twitter:image:src", in: html))
+            for src in imgSrcs(in: html) {
+                addImage(src)
+                if images.count >= 24 { break }
+            }
         }
 
         return PageMetadata(
@@ -205,6 +209,22 @@ nonisolated struct MetadataFetcher {
             }
         }
         return nil
+    }
+
+    /// The product's photo gallery, in Amazon's order, from the image block's
+    /// `'colorImages': { 'initial': A.$.parseJSON('[…]') }` data — each entry's `hiRes`
+    /// (≈1500 px), or `large` when there's no hi-res version.
+    static func amazonGalleryImages(in html: String) -> [String] {
+        guard let raw = firstCapture(#"'colorImages':\s*\{\s*'initial':\s*A\.\$\.parseJSON\('(.*?)'\)"#, in: html),
+              let data = raw.replacingOccurrences(of: "\\'", with: "'").data(using: .utf8),
+              let entries = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [] }
+        var urls: [String] = []
+        for entry in entries {
+            let url = (entry["hiRes"] as? String) ?? (entry["large"] as? String)
+            if let url, !urls.contains(url) { urls.append(url) }
+        }
+        return urls
     }
 
     /// The product photo: `#landingImage` (most products) or `#imgBlkFront` (books).

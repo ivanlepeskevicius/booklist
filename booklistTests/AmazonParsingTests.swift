@@ -63,6 +63,29 @@ struct AmazonParsingTests {
         #expect(!images.contains { $0.contains("/images/G/") })
     }
 
+    @Test("Only the product's gallery photos, in Amazon's order — no thumbnails, banners or logos")
+    func galleryOnly() {
+        let html = """
+        <img src="https://m.media-amazon.com/images/G/30/gno/sprites/nav-sprite-global-1x._CB546381700_.png" width="400" height="400">
+        <img alt="Product" src="https://m.media-amazon.com/images/I/81xI3eIdOLL._AC_SY300_SX300_.jpg" data-old-hires="https://m.media-amazon.com/images/I/81xI3eIdOLL._AC_SL1500_.jpg" id="landingImage">
+        <script>var data = { 'colorImages': { 'initial': A.$.parseJSON('[{"hiRes":"https://m.media-amazon.com/images/I/81xI3eIdOLL._AC_SL1500_.jpg","thumb":"https://m.media-amazon.com/images/I/51DrRbtiCgL._AC_US100_.jpg","large":"https://m.media-amazon.com/images/I/51DrRbtiCgL._AC_.jpg","variant":"MAIN"},{"hiRes":null,"thumb":"https://m.media-amazon.com/images/I/41x._AC_US100_.jpg","large":"https://m.media-amazon.com/images/I/41xLargeOnly._AC_.jpg","variant":"PT01"},{"hiRes":"https://m.media-amazon.com/images/I/81HN9qXjz-L._AC_SL1500_.jpg","large":"https://m.media-amazon.com/images/I/51y._AC_.jpg","variant":"PT02"}]')}, 'colorToAsin': {} };</script>
+        <img src="https://m.media-amazon.com/images/I/51xDXJHYROL._AC_US100_.jpg">
+        <img src="https://m.media-amazon.com/images/S/aplus-media-library-service-media/28822567-38ba.__CR0,0,970,600_PT0_SX970_V1___.jpg">
+        <img src="https://m.media-amazon.com/images/S/al-eu-726f4d26-7fdb/55d569b5._CR0,0,1200,628_SX1200_.jpg">
+        """
+        #expect(MetadataFetcher.parse(html: html, baseURL: productURL).imageURLs == [
+            "https://m.media-amazon.com/images/I/81xI3eIdOLL._AC_SL1500_.jpg",
+            "https://m.media-amazon.com/images/I/41xLargeOnly._AC_.jpg",      // no hi-res → large
+            "https://m.media-amazon.com/images/I/81HN9qXjz-L._AC_SL1500_.jpg",
+        ])
+    }
+
+    @Test("Gallery entries with an escaped quote in their data still parse")
+    func galleryWithEscapedQuote() {
+        let html = #"'colorImages': { 'initial': A.$.parseJSON('[{"hiRes":"https://m.media-amazon.com/images/I/A._AC_SL1500_.jpg","variant":"MAIN","altText":"Kid's stool"}]')}"#
+        #expect(MetadataFetcher.amazonGalleryImages(in: html) == ["https://m.media-amazon.com/images/I/A._AC_SL1500_.jpg"])
+    }
+
     @Test("Non-Amazon pages are not product pages and keep generic image rules")
     func otherSite() throws {
         let url = try #require(URL(string: "https://example.com/post"))

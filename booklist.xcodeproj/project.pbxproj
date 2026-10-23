@@ -17,6 +17,7 @@
 		171417A5308A7FD200517B3B /* LibraryFixture_1_2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171417A4308A7FD200517B3B /* LibraryFixture_1_2.swift */; };
 		171417A7308A7FE600517B3B /* ReleaseSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171417A6308A7FE600517B3B /* ReleaseSafetyTests.swift */; };
 		171417A9308A7FF800517B3B /* BackupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 171417A8308A7FF800517B3B /* BackupServiceTests.swift */; };
+		1714182C308B5C6D00517B3B /* AmazonImageRepairTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1714182B308B5C6D00517B3B /* AmazonImageRepairTests.swift */; };
 		178314BA2F97650300922140 /* booklist share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 178314AE2F97650300922140 /* booklist share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		178E71452FB70B0C002D66E9 /* FolderTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178E71442FB70B0C002D66E9 /* FolderTreeTests.swift */; };
 		178E71492FB7DBD4002D66E9 /* MasonryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178E71482FB7DBD4002D66E9 /* MasonryTests.swift */; };
@@ -79,6 +80,7 @@
 		171417A4308A7FD200517B3B /* LibraryFixture_1_2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFixture_1_2.swift; sourceTree = "<group>"; };
 		171417A6308A7FE600517B3B /* ReleaseSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseSafetyTests.swift; sourceTree = "<group>"; };
 		171417A8308A7FF800517B3B /* BackupServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupServiceTests.swift; sourceTree = "<group>"; };
+		1714182B308B5C6D00517B3B /* AmazonImageRepairTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmazonImageRepairTests.swift; sourceTree = "<group>"; };
 		1783145A2F94F46300922140 /* booklist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = booklist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314AE2F97650300922140 /* booklist share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "booklist share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		178314D92FA153BE00922140 /* booklistTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = booklistTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -236,6 +238,7 @@
 				171417A4308A7FD200517B3B /* LibraryFixture_1_2.swift */,
 				171417A6308A7FE600517B3B /* ReleaseSafetyTests.swift */,
 				171417A8308A7FF800517B3B /* BackupServiceTests.swift */,
+				1714182B308B5C6D00517B3B /* AmazonImageRepairTests.swift */,
 			);
 			path = booklistTests;
 			sourceTree = "<group>";
@@ -458,6 +461,7 @@
 				AA22000000000009AABB0009 /* SyncServiceRestoreTests.swift in Sources */,
 				171416303087BC7700517B3B /* StressTests.swift in Sources */,
 				AA2200000000000AAABB000A /* XCTestBridge.swift in Sources */,
+				1714182C308B5C6D00517B3B /* AmazonImageRepairTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
