@@ -31,6 +31,7 @@ struct MasonryView: View {
     @State private var leadID: UUID?
     @State private var shownCount = MasonryView.batchSize
     @State private var availableWidth: CGFloat = 0
+    @State private var placementMemo = PlacementMemo()
     @FocusState private var isFocused: Bool
 
     static let batchSize = 150
@@ -44,8 +45,34 @@ struct MasonryView: View {
 
     private var cardWidth: CGFloat { max(1, layout.itemWidth(in: availableWidth - padding * 2)) }
 
+    /// Placement depends on the cards and the display settings, not on the selection — and the
+    /// body runs on every click and arrow key. Recomputing it each time read several properties of
+    /// every loaded card (all of them once scrolled to the bottom of a large library).
+    final class PlacementMemo {
+        struct Key: Equatable {
+            var library: UnsafeRawPointer?, count: Int, shown: Int, width: CGFloat, columns: Int
+            var showsTitle: Bool, showsDate: Bool, titleSize: Double, noteSize: Double
+        }
+        var key: Key?
+        var placement = MasonryLayout.Placement(columns: [], frames: [])
+    }
+
     /// Column assignment and estimated frames for the cards in the current batch.
     private var placement: MasonryLayout.Placement {
+        let key = PlacementMemo.Key(
+            library: bookmarks.withUnsafeBufferPointer { UnsafeRawPointer($0.baseAddress) },
+            count: bookmarks.count, shown: shownCount, width: cardWidth, columns: columnCount,
+            showsTitle: showTitleOnCards, showsDate: showDateOnCards,
+            titleSize: cardTitleSize, noteSize: cardNoteSize
+        )
+        if placementMemo.key != key {
+            placementMemo.placement = computePlacement()
+            placementMemo.key = key
+        }
+        return placementMemo.placement
+    }
+
+    private func computePlacement() -> MasonryLayout.Placement {
         let shown = bookmarks.prefix(shownCount)
         let width = cardWidth
         let heights = shown.map { bookmark in
@@ -64,6 +91,8 @@ struct MasonryView: View {
     var body: some View {
         let placement = placement
         let shown = Array(bookmarks.prefix(shownCount))
+        // Worked out once per render, not once per selected card.
+        let selectedInOrder = selectedIDs.count > 1 ? bookmarks.filter { selectedIDs.contains($0.id) } : []
         ScrollViewReader { proxy in
             ScrollView {
                 HStack(alignment: .top, spacing: spacing) {
@@ -72,7 +101,7 @@ struct MasonryView: View {
                             // Identified by bookmark, not position, so a card's state (its image)
                             // never ends up on a different bookmark after a delete or reorder.
                             ForEach(placement.columns[column].map { shown[$0] }) { bookmark in
-                                card(for: bookmark)
+                                card(for: bookmark, selectedInOrder: selectedInOrder)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .top)
@@ -124,7 +153,7 @@ struct MasonryView: View {
         return bookmarks.first { $0.id == id }
     }
 
-    private func card(for bookmark: Bookmark) -> some View {
+    private func card(for bookmark: Bookmark, selectedInOrder: [Bookmark]) -> some View {
         BookmarkCardView(
             bookmark: bookmark,
             onOpen:   { open(bookmark) },
@@ -138,7 +167,7 @@ struct MasonryView: View {
                 select(bookmark.id, cmdHeld: cmdHeld, shiftHeld: shiftHeld)
                 isFocused = true   // so arrow keys work right after a click
             },
-            shareBookmarks: shareTargets(for: bookmark),
+            shareBookmarks: shareTargets(for: bookmark, selectedInOrder: selectedInOrder),
             showsUnfiledDot: showsUnfiledDot,
             folders: allFolders,
             tags: allTags
@@ -184,10 +213,8 @@ struct MasonryView: View {
 
     /// Returns the bookmarks that should be shared when the context menu is invoked on `bookmark`.
     /// If the card is part of the current selection, shares all selected; otherwise just this one.
-    private func shareTargets(for bookmark: Bookmark) -> [Bookmark] {
-        selectedIDs.contains(bookmark.id)
-            ? bookmarks.filter { selectedIDs.contains($0.id) }
-            : [bookmark]
+    private func shareTargets(for bookmark: Bookmark, selectedInOrder: [Bookmark]) -> [Bookmark] {
+        selectedIDs.count > 1 && selectedIDs.contains(bookmark.id) ? selectedInOrder : [bookmark]
     }
 
     private func select(_ id: UUID, cmdHeld: Bool, shiftHeld: Bool) {

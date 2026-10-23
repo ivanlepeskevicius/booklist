@@ -149,6 +149,8 @@ struct ContentAreaView: View {
         var key: Key?
         var bookmarks: [Bookmark] = []
         var tagIDs: Set<UUID> = []
+        /// Position of each bookmark in `bookmarks`, by ID.
+        var positions: [UUID: Int] = [:]
     }
 
     private func displayed() -> (bookmarks: [Bookmark], tagIDs: Set<UUID>) {
@@ -163,9 +165,19 @@ struct ContentAreaView: View {
             let scoped = scopedBookmarks
             displayMemo.bookmarks = filteredAndSorted(scoped)
             displayMemo.tagIDs = Set(scoped.flatMap { $0.tags.map(\.id) })
+            displayMemo.positions = Dictionary(displayMemo.bookmarks.enumerated().map { ($1.id, $0) },
+                                               uniquingKeysWith: { first, _ in first })
             displayMemo.key = key
         }
         return (displayMemo.bookmarks, displayMemo.tagIDs)
+    }
+
+    /// The selected bookmarks in display order. Looked up by position instead of scanning the list:
+    /// the body runs on every selection change, and reading `id` on thousands of SwiftData models
+    /// made each click or arrow key cost ~70 ms at 5,000 bookmarks.
+    private func selectedBookmarks() -> [Bookmark] {
+        let bookmarks = displayed().bookmarks
+        return selectedBookmarkIDs.compactMap { displayMemo.positions[$0] }.sorted().map { bookmarks[$0] }
     }
 
     // MARK: - Body
@@ -187,7 +199,7 @@ struct ContentAreaView: View {
                 content(for: bookmarks)
                     // safeAreaInset (not overlay) so the last cards can scroll above the bar.
                     .safeAreaInset(edge: .bottom) {
-                        let selected = bookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+                        let selected = selectedBookmarks()
                         if selected.count >= 2 {
                             selectionBar(selected: selected, all: bookmarks)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -209,7 +221,7 @@ struct ContentAreaView: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: readerBookmark != nil)
-        .background { keyboardShortcuts(for: bookmarks) }
+        .background { keyboardShortcuts() }
         .navigationTitle(navigationTitle)
         .searchable(text: $searchText, prompt: "Search \(navigationTitle)")
         .task(id: searchText) {
@@ -236,12 +248,9 @@ struct ContentAreaView: View {
                 viewOptionsMenu
 
                 if !bookmarks.isEmpty {
-                    let shareTargets = selectedBookmarkIDs.isEmpty
-                        ? bookmarks
-                        : bookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+                    let shareTargets = selectedBookmarkIDs.isEmpty ? bookmarks : selectedBookmarks()
                     let shareTitle: String = {
-                        if selectedBookmarkIDs.count == 1,
-                           let bm = bookmarks.first(where: { selectedBookmarkIDs.contains($0.id) }) {
+                        if selectedBookmarkIDs.count == 1, let bm = shareTargets.first {
                             return bm.title
                         } else if selectedBookmarkIDs.count > 1 {
                             return "\(selectedBookmarkIDs.count) Items"
@@ -276,7 +285,10 @@ struct ContentAreaView: View {
         .task {
             guard ProfileDriver.isEnabled else { return }
             for await note in NotificationCenter.default.notifications(named: ProfileDriver.manageNotification) {
-                if let id = note.object as? UUID { managingBookmark = allBookmarks.first { $0.id == id } }
+                // Fetched, not looked up in allBookmarks: this task captured the (empty) list of the first frame.
+                if let id = note.object as? UUID {
+                    managingBookmark = try? modelContext.fetch(FetchDescriptor<Bookmark>(predicate: #Predicate { $0.id == id })).first
+                }
             }
         }
         .task {
@@ -322,7 +334,7 @@ struct ContentAreaView: View {
             guard readerBookmark != nil,
                   newIDs.count == 1,
                   let id = newIDs.first,
-                  let bm = displayed().bookmarks.first(where: { $0.id == id }) else { return }
+                  let bm = selectedBookmarks().first, bm.id == id else { return }
             readerBookmark = bm
         }
         // Auto-open capture when a URL arrives from the Share Extension / deep link.
@@ -391,8 +403,8 @@ struct ContentAreaView: View {
 
     /// Invisible buttons that exist only to carry key equivalents for the main window.
     /// Shortcuts that would clash with typing are disabled while the search field is focused.
-    private func keyboardShortcuts(for bookmarks: [Bookmark]) -> some View {
-        let selected = bookmarks.filter { selectedBookmarkIDs.contains($0.id) }
+    private func keyboardShortcuts() -> some View {
+        let selected = selectedBookmarks()
         return Group {
             Button("Search") { isSearchFocused = true }
                 .keyboardShortcut("f", modifiers: .command)

@@ -43,7 +43,8 @@ enum ProfileDriver {
         // Selecting cards one after another (a click, or holding an arrow key).
         let visible = bookmarks.sorted { $0.dateAdded > $1.dateAdded }.prefix(25)
         var selecting: [Double] = []
-        for bookmark in visible {
+        log("selecting cards…")
+        for bookmark in Array(visible) + Array(visible) + Array(visible) + Array(visible) {
             selecting.append(await measure { NotificationCenter.default.post(name: selectCardsNotification, object: Set([bookmark.id])) })
         }
         NotificationCenter.default.post(name: selectCardsNotification, object: Set<UUID>())
@@ -77,7 +78,6 @@ enum ProfileDriver {
         let open = await measure { NotificationCenter.default.post(name: manageNotification, object: target.id) }
         log("open edit panel (\(target.imageURLs.count) candidate images): \(ms(open))")
         try? await Task.sleep(for: .seconds(3))
-
         var typing: [Double] = []
         for character in "The quick brown fox jumps over the lazy dog, twice over" {
             typing.append(await measure { type(character, fallback: target) })
@@ -109,13 +109,13 @@ enum ProfileDriver {
         NotificationCenter.default.post(name: selectNotification, object: SidebarSelection.all)
         try? await Task.sleep(for: .seconds(2))
         let savedViewMode = UserDefaults.standard.string(forKey: "viewMode")
-        for mode in ["masonry", "list"] {
+        for mode in [ViewMode.masonry.rawValue, ViewMode.list.rawValue] {
             UserDefaults.standard.set(mode, forKey: "viewMode")
             try? await Task.sleep(for: .seconds(2))
             log("scroll \(mode): \(summary(await scrollToBottom()))")
         }
         // Typing again after scrolling masonry to the bottom (every card loaded into the layout).
-        UserDefaults.standard.set("masonry", forKey: "viewMode")
+        UserDefaults.standard.set(ViewMode.masonry.rawValue, forKey: "viewMode")
         try? await Task.sleep(for: .seconds(2))
         _ = await scrollToBottom()
         NotificationCenter.default.post(name: manageNotification, object: target.id)
@@ -125,6 +125,36 @@ enum ProfileDriver {
             typingAfterScroll.append(await measure { type(character, fallback: target) })
         }
         log("typing after scrolling \(typingAfterScroll.count) characters: \(summary(typingAfterScroll))")
+        NSApp.windows.forEach { window in window.sheets.forEach { window.endSheet($0) } }
+        try? await Task.sleep(for: .seconds(1))
+        var selectingAfterScroll: [Double] = []
+        for bookmark in visible {
+            selectingAfterScroll.append(await measure { NotificationCenter.default.post(name: selectCardsNotification, object: Set([bookmark.id])) })
+        }
+        NotificationCenter.default.post(name: selectCardsNotification, object: Set<UUID>())
+        log("selecting a card after scrolling \(selectingAfterScroll.count)×: \(summary(selectingAfterScroll))")
+
+        // Soak (`-profileSoak N`): repeat the heavy steps to show memory levels off instead of growing.
+        let rounds = UserDefaults.standard.integer(forKey: "profileSoak")
+        for round in 0..<rounds {
+            for selection in [SidebarSelection.wishlist, .inbox, .all] {
+                NotificationCenter.default.post(name: selectNotification, object: selection)
+                try? await Task.sleep(for: .seconds(1))
+            }
+            var lags: [Double] = []
+            for mode in [ViewMode.masonry, .list] {
+                UserDefaults.standard.set(mode.rawValue, forKey: "viewMode")
+                try? await Task.sleep(for: .seconds(1))
+                lags += await scrollToBottom()
+            }
+            for bookmark in visible.prefix(3) {
+                NotificationCenter.default.post(name: manageNotification, object: bookmark.id)
+                try? await Task.sleep(for: .seconds(1))
+                NSApp.windows.forEach { window in window.sheets.forEach { window.endSheet($0) } }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            log("soak round \(round + 1)/\(rounds): scrolling \(summary(lags)), resident \(residentMB()) MB")
+        }
 
         if let savedViewMode { UserDefaults.standard.set(savedViewMode, forKey: "viewMode") }
         else { UserDefaults.standard.removeObject(forKey: "viewMode") }
@@ -226,6 +256,18 @@ enum ProfileDriver {
     }
 
     private static func ms(_ seconds: Double) -> String { String(format: "%.0f ms", seconds * 1000) }
+
+    /// Physical footprint, the number Activity Monitor shows as Memory.
+    private static func residentMB() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Int(info.phys_footprint / 1_048_576) : -1
+    }
 
     private static func summary(_ values: [Double]) -> String {
         let sorted = values.sorted()

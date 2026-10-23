@@ -133,9 +133,13 @@ enum FolderTree {
     /// "Parent › Child" path label — for folder picker menus.
     static func flattened(_ folders: [Folder]) -> [(folder: Folder, path: String)] {
         var result: [(folder: Folder, path: String)] = []
+        // Grouped once: `parent` is a relationship read, and filtering every folder at every level
+        // made this folders² reads — ~95 ms per library change with 80 folders while the edit panel
+        // (which lists folders) is open.
+        let childrenByParent = Dictionary(grouping: folders) { $0.parent?.id }
         func walk(parentID: UUID?, prefix: String, seen: Set<UUID>) {
-            let siblings = folders
-                .filter { $0.parent?.id == parentID && !seen.contains($0.id) }
+            let siblings = (childrenByParent[parentID] ?? [])
+                .filter { !seen.contains($0.id) }
                 .sorted { $0.sortOrder < $1.sortOrder }
             for folder in siblings {
                 let path = prefix.isEmpty ? folder.name : "\(prefix) › \(folder.name)"

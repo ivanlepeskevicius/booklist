@@ -12,7 +12,7 @@ struct BookmarkListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var allFolders: [Folder]
     @Query(sort: \Tag.name) private var allTags: [Tag]
-    @State private var sortOrder = [KeyPathComparator<Bookmark>(\Bookmark.dateAdded, order: .reverse)]
+    @State private var sortOrder = [KeyPathComparator<BookmarkRow>(\BookmarkRow.dateAdded, order: .reverse)]
 
     @AppStorage("listShowSource")     private var listShowSource     = true
     @AppStorage("listShowSaved")      private var listShowSaved      = true
@@ -20,27 +20,83 @@ struct BookmarkListView: View {
     @AppStorage("listShowPrice")      private var listShowPrice      = true
     @AppStorage("listShowTags")       private var listShowTags       = true
 
-    private var sortedBookmarks: [Bookmark] {
-        bookmarks.sorted(using: sortOrder)
+    /// What one row shows, copied out of the bookmark when the list is built. Cells read only these
+    /// values: every SwiftData property a cell reads is change-tracked, and the table re-registers the
+    /// tracking of all its rows each time a row scrolls into view — measured 220 ms per scroll step at
+    /// 1,000 bookmarks and 415 ms at 3,000. Rows are rebuilt whenever the library changes; being
+    /// Equatable lets the table redraw just the rows whose values changed.
+    struct BookmarkRow: Identifiable, Equatable {
+        let id: UUID
+        let bookmark: Bookmark
+        let title: String
+        let note: String?
+        let url: String
+        let host: String
+        let faviconURL: String?
+        let dateAdded: Date
+        let lastOpenedDate: Date?
+        let lastOpenedSortKey: Date
+        let isBookmark: Bool
+        let price: String?
+        let tags: [TagChip]
+        let tagCount: Int
+        let tagSortKey: String
+
+        init(_ bookmark: Bookmark) {
+            id = bookmark.id
+            self.bookmark = bookmark
+            title = bookmark.title
+            note = bookmark.note
+            url = bookmark.url
+            host = URL(string: bookmark.url)?.host ?? "—"
+            faviconURL = bookmark.faviconURL
+            dateAdded = bookmark.dateAdded
+            lastOpenedDate = bookmark.lastOpenedDate
+            lastOpenedSortKey = bookmark.lastOpenedDateForSorting
+            let itemType = bookmark.itemType
+            isBookmark = itemType == .bookmark
+            price = itemType == .wishlistItem ? bookmark.price.flatMap { $0.isEmpty ? nil : $0 } : nil
+            let allTags = bookmark.tags
+            tags = allTags.prefix(3).map { TagChip($0) }
+            tagCount = allTags.count
+            tagSortKey = allTags.map(\.name).min() ?? ""
+        }
+    }
+
+    struct TagChip: Identifiable, Equatable {
+        let tag: Tag
+        let name: String
+        let color: String
+        var id: PersistentIdentifier { tag.persistentModelID }
+
+        init(_ tag: Tag) {
+            self.tag = tag
+            name = tag.name
+            color = tag.color
+        }
+    }
+
+    private var sortedRows: [BookmarkRow] {
+        bookmarks.map { BookmarkRow($0) }.sorted(using: sortOrder)
     }
 
     var body: some View {
-        Table(sortedBookmarks, selection: $selectedIDs, sortOrder: $sortOrder) {
+        Table(sortedRows, selection: $selectedIDs, sortOrder: $sortOrder) {
             // Title + note column — also the drag handle for the row.
-            TableColumn("Title", value: \Bookmark.title) { bookmark in
+            TableColumn("Title", value: \BookmarkRow.title) { row in
                 HStack(spacing: 8) {
-                    faviconView(bookmark)
+                    faviconView(row.faviconURL)
                     VStack(alignment: .leading, spacing: 2) {
                         Button {
-                            open(bookmark)
+                            open(row.bookmark)
                         } label: {
-                            Text(bookmark.title)
+                            Text(row.title)
                                 .fontWeight(.medium)
                                 .lineLimit(1)
                         }
                         .buttonStyle(.link)
 
-                        if let note = bookmark.note, !note.isEmpty {
+                        if let note = row.note, !note.isEmpty {
                             Text(note)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -50,16 +106,16 @@ struct BookmarkListView: View {
                 }
                 // Dragging the title cell drags all selected rows, or just this one if unselected.
                 .draggable(
-                    selectedIDs.contains(bookmark.id)
+                    selectedIDs.contains(row.id)
                         ? BookmarkTransfer(ids: Array(selectedIDs))
-                        : BookmarkTransfer(ids: [bookmark.id])
+                        : BookmarkTransfer(ids: [row.id])
                 )
             }
 
             if listShowSource {
                 // Domain column (sortable by url)
-                TableColumn("Source", value: \Bookmark.url) { bookmark in
-                    Text(URL(string: bookmark.url)?.host ?? "—")
+                TableColumn("Source", value: \BookmarkRow.url) { row in
+                    Text(row.host)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -68,17 +124,17 @@ struct BookmarkListView: View {
 
             if listShowSaved {
                 // Date column (sortable by dateAdded)
-                TableColumn("Saved", value: \Bookmark.dateAdded) { bookmark in
-                    Text(bookmark.dateAdded.formatted(date: .abbreviated, time: .omitted))
+                TableColumn("Saved", value: \BookmarkRow.dateAdded) { row in
+                    Text(row.dateAdded.formatted(date: .abbreviated, time: .omitted))
                         .foregroundStyle(.secondary)
                 }
                 .width(90)
             }
 
             if listShowLastOpened {
-                // Last Opened column (sortable via lastOpenedDateForSorting proxy)
-                TableColumn("Last Opened", value: \Bookmark.lastOpenedDateForSorting) { bookmark in
-                    if let date = bookmark.lastOpenedDate {
+                // Last Opened column (never-opened items sort as the oldest)
+                TableColumn("Last Opened", value: \BookmarkRow.lastOpenedSortKey) { row in
+                    if let date = row.lastOpenedDate {
                         Text(date.formatted(date: .abbreviated, time: .omitted))
                             .foregroundStyle(.secondary)
                     } else {
@@ -91,8 +147,8 @@ struct BookmarkListView: View {
 
             if listShowPrice {
                 // Price column — only populated for wishlist items
-                TableColumn("Price") { bookmark in
-                    if bookmark.itemType == .wishlistItem, let price = bookmark.price, !price.isEmpty {
+                TableColumn("Price") { row in
+                    if let price = row.price {
                         Text(price)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -102,25 +158,25 @@ struct BookmarkListView: View {
             }
 
             if listShowTags {
-                TableColumn("Tags", value: \Bookmark.tagSortKey) { bookmark in
-                    if !bookmark.tags.isEmpty {
+                TableColumn("Tags", value: \BookmarkRow.tagSortKey) { row in
+                    if !row.tags.isEmpty {
                         HStack(spacing: 3) {
-                            ForEach(bookmark.tags.prefix(3)) { tag in
-                                Button { onTagTap?(tag) } label: {
-                                    Text("#\(tag.name)")
+                            ForEach(row.tags) { chip in
+                                Button { onTagTap?(chip.tag) } label: {
+                                    Text("#\(chip.name)")
                                         .font(.caption2)
                                         .lineLimit(1)
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 2)
-                                        .background(Color(hex: tag.color).opacity(0.15),
+                                        .background(Color(hex: chip.color).opacity(0.15),
                                                     in: Capsule())
-                                        .foregroundStyle(Color(hex: tag.color))
+                                        .foregroundStyle(Color(hex: chip.color))
                                 }
                                 .buttonStyle(.plain)
-                                .help("Filter by #\(tag.name)")
+                                .help("Filter by #\(chip.name)")
                             }
-                            if bookmark.tags.count > 3 {
-                                Text("+\(bookmark.tags.count - 3)")
+                            if row.tagCount > 3 {
+                                Text("+\(row.tagCount - 3)")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -131,10 +187,10 @@ struct BookmarkListView: View {
             }
 
             // Actions column (not sortable)
-            TableColumn("") { bookmark in
+            TableColumn("") { row in
                 HStack(spacing: 2) {
-                    if bookmark.itemType == .bookmark {
-                        Button { onRead(bookmark) } label: {
+                    if row.isBookmark {
+                        Button { onRead(row.bookmark) } label: {
                             Image(systemName: "eyeglasses")
                         }
                         .buttonStyle(.borderless)
@@ -142,21 +198,21 @@ struct BookmarkListView: View {
                     }
 
                     Button {
-                        open(bookmark)
+                        open(row.bookmark)
                     } label: {
                         Image(systemName: "arrow.up.right.square")
                     }
                     .buttonStyle(.borderless)
                     .help("Open in browser")
 
-                    Button { onManage(bookmark) } label: {
+                    Button { onManage(row.bookmark) } label: {
                         Image(systemName: "slider.horizontal.3")
                     }
                     .buttonStyle(.borderless)
                     .help("Edit")
 
                     Button(role: .destructive) {
-                        delete([bookmark])
+                        delete([row.bookmark])
                     } label: {
                         Image(systemName: "trash")
                     }
@@ -212,8 +268,8 @@ struct BookmarkListView: View {
     }
 
     @ViewBuilder
-    private func faviconView(_ bookmark: Bookmark) -> some View {
-        if let urlStr = bookmark.faviconURL, let url = URL(string: urlStr) {
+    private func faviconView(_ faviconURL: String?) -> some View {
+        if let urlStr = faviconURL, let url = URL(string: urlStr) {
             AsyncImage(url: url) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
