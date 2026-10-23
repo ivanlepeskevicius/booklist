@@ -364,6 +364,42 @@ final class UserFlowUITests: XCTestCase {
                       "The edited note isn't on the card")
     }
 
+    /// The list view shows copies of the bookmarks' values (for scrolling speed) — an edit must
+    /// still show up in its row, and select / delete / undo must work on rows.
+    @MainActor
+    func testListViewRows() throws {
+        launch()
+        selectSidebar("All")
+        app.typeKey("2", modifierFlags: .command)
+        defer { app.typeKey("1", modifierFlags: .command) }   // leave All in masonry, as the tests found it
+        let title = window.descendants(matching: .any).matching(titlePredicate("SwiftUI by Example")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "Row not in the list\n\(window.debugDescription)")
+
+        title.rightClick()
+        app.menuItems["Edit"].click()
+        let sheet = window.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Edit panel didn't open from the list")
+        let note = sheet.textViews.firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 5), sheet.debugDescription)
+        note.click()
+        app.typeKey("a", modifierFlags: .command)
+        note.typeText("Edited in the list")
+        sheet.buttons["Done"].click()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(waitForText(in: window, containing: "Edited in the list", timeout: 5),
+                      "The row didn't update after the edit")
+
+        // Select the row by its note (the title is a link that opens the browser), delete, undo.
+        window.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@",
+                                                "Edited in the list", "Edited in the list")).firstMatch.click()
+        app.typeKey(.delete, modifierFlags: .command)
+        XCTAssertTrue(waitUntil(timeout: 5) { !self.hasText(in: self.window, containing: "Edited in the list") },
+                      "⌘⌫ didn't delete the selected row")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(waitForText(in: window, containing: "Edited in the list", timeout: 5),
+                      "⌘Z didn't bring the row back")
+    }
+
     @MainActor
     func testSearch() throws {
         launch()
