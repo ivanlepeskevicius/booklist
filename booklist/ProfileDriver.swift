@@ -19,12 +19,33 @@ enum ProfileDriver {
     /// The tester's store bundled into the debug app (`Contents/Resources/Profiling/default.store`),
     /// copied to tmp so the bundle is never written to.
     static var libraryCopyURL: URL? {
-        guard ProcessInfo.processInfo.arguments.contains("-profileLibrary"),
+        let arguments = ProcessInfo.processInfo.arguments
+        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("profile-\(ProcessInfo.processInfo.processIdentifier).store")
+        // `-profileRealLibrary`: a copy of this Mac's own library (store + its WAL files), so the
+        // real one is never written to. Images are the real ones (read only).
+        if arguments.contains("-profileRealLibrary") {
+            let real = booklistApp.storeConfiguration(inMemory: false).url
+            if !FileManager.default.fileExists(atPath: copy.path) {
+                for suffix in ["", "-wal", "-shm"] {
+                    let source = URL(fileURLWithPath: real.path + suffix)
+                    guard FileManager.default.fileExists(atPath: source.path) else { continue }
+                    try? FileManager.default.copyItem(at: source, to: URL(fileURLWithPath: copy.path + suffix))
+                }
+            }
+            return copy
+        }
+        guard arguments.contains("-profileLibrary"),
               let bundled = Bundle.main.url(forResource: "default", withExtension: "store", subdirectory: "Profiling")
         else { return nil }
-        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("profile-\(ProcessInfo.processInfo.processIdentifier).store")
         if !FileManager.default.fileExists(atPath: copy.path) { try? FileManager.default.copyItem(at: bundled, to: copy) }
         return copy
+    }
+
+    /// Called before any image is requested. `-profileNoImageCache`: every web image is downloaded
+    /// again, like the first launch after an update that changed many card images.
+    static func prepare() {
+        guard LaunchMode.isUITesting, ProcessInfo.processInfo.arguments.contains("-profileNoImageCache") else { return }
+        URLCache.shared = URLCache(memoryCapacity: 0, diskCapacity: 0)
     }
 
     @MainActor
@@ -32,6 +53,44 @@ enum ProfileDriver {
         guard isEnabled else { return }
         let bookmarks = (try? context.fetch(FetchDescriptor<Bookmark>())) ?? []
         log("start: \(bookmarks.count) bookmarks")
+
+        // `-profileScrollFirst`: what the tester did — scroll down at trackpad speed right after
+        // launch, while the card images are still arriving.
+        if ProcessInfo.processInfo.arguments.contains("-profileScrollFirst") {
+            try? await Task.sleep(for: .seconds(2))
+            for (name, selection) in [("Wishlist", SidebarSelection.wishlist), ("All", .all)] {
+                NotificationCenter.default.post(name: selectNotification, object: selection)
+                try? await Task.sleep(for: .seconds(1))
+                log("slow scroll \(name): \(summary(await scrollDown(steps: 120, by: 120, pause: .milliseconds(60))))")
+            }
+        }
+        // `-profileScrollOnly N`: only the scrolling, N rounds — the freezes were intermittent,
+        // so one clean pass proves little.
+        let scrollRounds = UserDefaults.standard.integer(forKey: "profileScrollOnly")
+        if scrollRounds > 0 {
+            Task {   // DIAGNOSTIC — remove
+                while true {
+                    try? await Task.sleep(for: .seconds(2))
+                    log("counters: masonry body \(MasonryView.bodyCount), band changes \(MasonryView.bandChanges), width changes \(MasonryView.widthChanges)")
+                }
+            }
+            NotificationCenter.default.post(name: selectNotification, object: SidebarSelection.all)
+            try? await Task.sleep(for: .seconds(2))
+            let savedViewMode = UserDefaults.standard.string(forKey: "viewMode")
+            for round in 1...scrollRounds {
+                for mode in [ViewMode.masonry, .list] {
+                    UserDefaults.standard.set(mode.rawValue, forKey: "viewMode")
+                    try? await Task.sleep(for: .seconds(1))
+                    let down = await scrollToBottom()
+                    let up = await scrollToTop()
+                    log("round \(round) \(mode.rawValue): down \(summary(down)); up \(summary(up))")
+                }
+            }
+            if let savedViewMode { UserDefaults.standard.set(savedViewMode, forKey: "viewMode") }
+            else { UserDefaults.standard.removeObject(forKey: "viewMode") }
+            return log("done")
+        }
+
         try? await Task.sleep(for: .seconds(4))
 
         for (name, selection) in [("All", SidebarSelection.all), ("Wishlist", .wishlist), ("Inbox", .inbox), ("All", .all)] {
@@ -159,6 +218,40 @@ enum ProfileDriver {
         if let savedViewMode { UserDefaults.standard.set(savedViewMode, forKey: "viewMode") }
         else { UserDefaults.standard.removeObject(forKey: "viewMode") }
         log("done")
+    }
+
+    /// Scrolls back up in 600 pt steps until the top.
+    @MainActor
+    private static func scrollToTop() async -> [Double] {
+        guard let content = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })?.contentView,
+              let scrollView = largestScrollView(in: content) else { return [] }
+        var lags: [Double] = []
+        while scrollView.contentView.bounds.origin.y > 0 && lags.count < 400 {
+            let clip = scrollView.contentView
+            lags.append(await measure {
+                clip.scroll(to: NSPoint(x: 0, y: max(0, clip.bounds.origin.y - 600)))
+                scrollView.reflectScrolledClipView(clip)
+            })
+        }
+        return lags
+    }
+
+    /// Scrolls down `steps` times by `by` points with a pause in between; returns the lag of each step.
+    @MainActor
+    private static func scrollDown(steps: Int, by distance: CGFloat, pause: Duration) async -> [Double] {
+        guard let content = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })?.contentView,
+              let scrollView = largestScrollView(in: content) else { log("no scroll view"); return [] }
+        var lags: [Double] = []
+        for _ in 0..<steps {
+            let clip = scrollView.contentView
+            let maxY = (scrollView.documentView?.frame.height ?? 0) - clip.bounds.height
+            lags.append(await measure {
+                clip.scroll(to: NSPoint(x: 0, y: min(maxY, clip.bounds.origin.y + distance)))
+                scrollView.reflectScrolledClipView(clip)
+            })
+            try? await Task.sleep(for: pause)
+        }
+        return lags
     }
 
     /// Scrolls the main content scroll view down in 600 pt steps, like a fast trackpad scroll,

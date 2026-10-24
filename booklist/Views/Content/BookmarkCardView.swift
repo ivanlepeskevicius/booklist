@@ -32,6 +32,10 @@ struct BookmarkCardView: View {
     /// Offered in the context menu's "Move to Folder" / "Tags" submenus.
     var folders: [Folder] = []
     var tags: [Tag] = []
+    /// Masonry: the height the layout gave this card. The image fills what the text leaves, so the
+    /// card never changes height when its image arrives (that made the lazy columns re-lay out
+    /// over and over, and froze the app while many images loaded).
+    var fixedHeight: CGFloat? = nil
 
     @State private var isHovered         = false
     @State private var thumbnailImage: NSImage?
@@ -110,8 +114,10 @@ struct BookmarkCardView: View {
                 }
             if hasCardBody {
                 cardBody
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(height: fixedHeight, alignment: .top)
         .background(.background)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         // Base border
@@ -226,12 +232,19 @@ struct BookmarkCardView: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(height: 160)
                         .clipped()
+                case .fit where fixedHeight != nil:
+                    Image(nsImage: image).resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
                 case .fit:
                     Image(nsImage: image).resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: 500)
                         .clipped()
                 }
+            } else if bookmark.selectedImageURL != nil, fixedHeight != nil {
+                Rectangle().fill(.quaternary)
             } else if bookmark.selectedImageURL != nil, let aspect = thumbnailAspect {
                 // Image released while off-screen — hold its exact size.
                 Rectangle().fill(.quaternary)
@@ -242,12 +255,17 @@ struct BookmarkCardView: View {
             }
         }
         // Hard cap so a wide image can never overflow the card at narrow column widths.
-        .frame(maxWidth: .infinity, maxHeight: thumbnailStyle == .fill ? 160 : 500)
+        .frame(maxWidth: .infinity, maxHeight: thumbnailMaxHeight)
         .clipped()
         .onScrollVisibilityChange(threshold: 0.01) { isOnScreen = $0 }
         // nil while off-screen, which releases the decoded image; lazy stacks keep the cards
         // the user has scrolled past, so without this memory would grow with scrolling.
         .task(id: isOnScreen ? bookmark.selectedImageURL : nil) { await loadThumbnail() }
+    }
+
+    private var thumbnailMaxHeight: CGFloat {
+        if thumbnailStyle == .fill { return 160 }
+        return fixedHeight == nil ? 500 : .infinity
     }
 
     /// Loads the card image downsampled to card size (cached), instead of decoding it at full resolution.
@@ -281,7 +299,7 @@ struct BookmarkCardView: View {
                 placeholderIcon
             }
         }
-        .frame(height: 100)
+        .frame(minHeight: fixedHeight == nil ? 100 : 0, maxHeight: fixedHeight == nil ? 100 : .infinity)
     }
 
     private var placeholderIcon: some View {

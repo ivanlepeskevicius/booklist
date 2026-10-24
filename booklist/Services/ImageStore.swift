@@ -87,7 +87,51 @@ struct ImageStore {
 
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         thumbnailCache.setObject(image, forKey: key, cost: cgImage.bytesPerRow * cgImage.height)
+        if !url.isFileURL, cgImage.height > 0 {
+            rememberAspect(CGFloat(cgImage.width) / CGFloat(cgImage.height), for: url.absoluteString)
+        }
         return image
+    }
+
+    /// Width ÷ height of a card image whose shape is known before it loads: saved images from
+    /// their file header, web images once they have loaded (this launch or an earlier one).
+    static func knownAspectRatio(of urlString: String) -> CGFloat? {
+        urlString.hasPrefix("file:") ? aspectRatio(ofLocalImage: urlString) : remoteAspects[urlString]
+    }
+
+    // MARK: - Web image shapes
+
+    /// Kept across launches so masonry cards get their real shape from the start. A card that
+    /// changed height when its image arrived made the lazy columns re-lay out and re-correct the
+    /// scroll position; with many images arriving while scrolling, that froze the app for 20+
+    /// seconds (tester, beta 1.2 (6)). Cards now keep the height they were laid out with.
+    private static var remoteAspects: [String: CGFloat] = {
+        guard let data = try? Data(contentsOf: remoteAspectsFile),
+              let saved = try? JSONDecoder().decode([String: CGFloat].self, from: data) else { return [:] }
+        return saved
+    }()
+    private static var remoteAspectsSaveScheduled = false
+
+    nonisolated private static var remoteAspectsFile: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("web-image-shapes.json")
+    }
+
+    /// Saved a few seconds after the last new shape, so a screenful of arriving images is one write.
+    private static func rememberAspect(_ aspect: CGFloat, for urlString: String) {
+        guard remoteAspects[urlString] == nil else { return }
+        remoteAspects[urlString] = aspect
+        guard !remoteAspectsSaveScheduled else { return }
+        remoteAspectsSaveScheduled = true
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            remoteAspectsSaveScheduled = false
+            let snapshot = remoteAspects
+            let file = remoteAspectsFile
+            await Task.detached(priority: .utility) {
+                try? JSONEncoder().encode(snapshot).write(to: file, options: .atomic)
+            }.value
+        }
     }
 
     private static var aspectCache: [String: CGFloat] = [:]

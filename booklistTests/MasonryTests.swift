@@ -409,4 +409,28 @@ struct MasonryEstimateTests {
         #expect(long == 75)          // 5 lines × 12 × 1.25
         #expect(paragraphs == 45)    // each line break starts a new line
     }
+
+    /// textHeight stops counting early for speed; it must still match wrapping every paragraph.
+    @Test("Early-stopping text estimate matches the full count")
+    func matchesFullCount() {
+        func reference(_ text: String, width: CGFloat, fontSize: Double, maxLines: Int) -> CGFloat {
+            let charsPerLine = max(1, Int(width / (fontSize * 0.52)))
+            let wrapped = text.split(separator: "\n", omittingEmptySubsequences: false)
+                .reduce(0) { $0 + max(1, ($1.count + charsPerLine - 1) / charsPerLine) }
+            return CGFloat(min(maxLines, wrapped)) * fontSize * 1.25
+        }
+        var generator = SystemRandomNumberGenerator()
+        let pieces = ["a", "word ", "é", "👍🏽", "\n", "\n\n", "\r\n", String(repeating: "x", count: 90)]
+        for _ in 0..<2_000 {
+            let text = (0..<Int.random(in: 0...60, using: &generator))
+                .map { _ in pieces.randomElement(using: &generator) ?? "" }.joined()
+            for width in [1.0, 40, 180, 600] {
+                for maxLines in [1, 2, 5] {
+                    #expect(MasonryEstimate.textHeight(text, width: width, fontSize: 12, maxLines: maxLines)
+                            == reference(text, width: width, fontSize: 12, maxLines: maxLines),
+                            "\(text.debugDescription) width \(width) maxLines \(maxLines)")
+                }
+            }
+        }
+    }
 }

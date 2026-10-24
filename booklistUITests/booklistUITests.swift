@@ -542,3 +542,35 @@ final class UserFlowUITests: XCTestCase {
         return condition()
     }
 }
+
+// TEMPORARY — hang reproduction, not to be committed.
+final class HangRepro: XCTestCase {
+    @MainActor
+    func testScrollRightAfterLaunch() throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: "/tmp/booklist-run-ui-tests"))
+        let extra = (ProcessInfo.processInfo.environment["REPRO_ARGS"] ?? "").split(separator: " ").map(String.init)
+        let app = launchBooklist(extraArguments: ["-profileRealLibrary"] + extra, windowTimeout: 60)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(app.outlines.firstMatch.waitForExistence(timeout: 60))
+        let sections = (ProcessInfo.processInfo.environment["REPRO_SECTIONS"] ?? "Wishlist All").split(separator: " ").map(String.init)
+        for section in sections {
+            let texts = app.outlines.firstMatch.staticTexts
+            if let index = texts.allElementsBoundByIndex.firstIndex(where: { ($0.label.isEmpty ? ($0.value as? String ?? "") : $0.label) == section }) {
+                texts.element(boundBy: index).click()
+            }
+            let point = window.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5))
+            var steps: [Double] = []
+            for _ in 0..<60 {
+                let start = Date()
+                point.scroll(byDeltaX: 0, deltaY: -250)
+                steps.append(Date().timeIntervalSince(start))
+                if steps.last ?? 0 > 15 { break }
+            }
+            let sorted = steps.sorted()
+            print(String(format: "REPRO %@: %d scroll steps, median %.2f s, max %.2f s, total %.1f s", section, steps.count,
+                         sorted[sorted.count / 2], sorted.last ?? 0, steps.reduce(0, +)))
+            XCTAssertEqual(app.state, .runningForeground)
+        }
+        app.terminate()
+    }
+}

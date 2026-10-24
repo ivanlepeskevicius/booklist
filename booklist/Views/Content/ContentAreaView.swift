@@ -147,6 +147,9 @@ struct ContentAreaView: View {
             var sort: SortOption, nonce: Int
         }
         var key: Key?
+        /// The arrays the key's addresses came from, kept alive so a freed buffer's address can't
+        /// be reused by a new array with the same count (which would look unchanged).
+        var sources: ([Bookmark], [Folder]) = ([], [])
         var bookmarks: [Bookmark] = []
         var tagIDs: Set<UUID> = []
         /// Position of each bookmark in `bookmarks`, by ID.
@@ -167,6 +170,7 @@ struct ContentAreaView: View {
             displayMemo.tagIDs = Set(scoped.flatMap { $0.tags.map(\.id) })
             displayMemo.positions = Dictionary(displayMemo.bookmarks.enumerated().map { ($1.id, $0) },
                                                uniquingKeysWith: { first, _ in first })
+            displayMemo.sources = (allBookmarks, allFolders)
             displayMemo.key = key
         }
         return (displayMemo.bookmarks, displayMemo.tagIDs)

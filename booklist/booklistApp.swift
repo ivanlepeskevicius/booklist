@@ -296,6 +296,7 @@ struct booklistApp: App {
     var sharedModelContainer: ModelContainer = {
         do {
             #if DEBUG
+            ProfileDriver.prepare()
             if LaunchMode.isUITesting, let profileLibrary = ProfileDriver.libraryCopyURL {
                 return try ModelContainer(for: booklistApp.schema,
                                           configurations: [ModelConfiguration(schema: booklistApp.schema, url: profileLibrary)])
